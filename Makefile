@@ -1,5 +1,5 @@
 
-all: fmt tidy vend build test vet lint cover
+all: fmt tidy build test vet lint 
 
 it: all
 
@@ -31,4 +31,4 @@ cover:
 .PHONY: all clean it fmt tidy build test vet lint cover
 
 clean:
-	rm -f *.o crex
+	rm -f *.o dbHandler 
