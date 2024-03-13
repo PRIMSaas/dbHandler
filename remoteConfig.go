@@ -8,13 +8,14 @@ import (
 	"os"
 
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/firebaseremoteconfig/v1"
 )
 
 const BASE_URL = "https://firebaseremoteconfig.googleapis.com"
 const REMOTE_CONFIG_ENDPOINT = "/v1/projects/" + PROJECT_ID + "/remoteConfig"
 const REMOTE_CONFIG_URL = BASE_URL + REMOTE_CONFIG_ENDPOINT
 
-type RemoteConfig struct {
+/* type RemoteConfig struct {
 	Parameters map[string]Parameter `json:"parameters"`
 	Etag       string               `json:"etag"`
 }
@@ -27,9 +28,9 @@ type Parameter struct {
 
 type Value struct {
 	Value string `json:"value"`
-}
+} */
 
-var params map[string]Parameter = make(map[string]Parameter)
+var params map[string]firebaseremoteconfig.RemoteConfigParameter = make(map[string]firebaseremoteconfig.RemoteConfigParameter)
 
 func initConfig() {
 	token, err := getAccessToken(KEYFILE)
@@ -44,7 +45,7 @@ func initConfig() {
 		return
 	}
 
-	var remoteConfig RemoteConfig
+	var remoteConfig firebaseremoteconfig.RemoteConfig
 	err = json.Unmarshal([]byte(remoteConfigStr), &remoteConfig)
 	if err != nil {
 		logError.Printf("Failed to parse remote config: %v", err)
@@ -89,7 +90,8 @@ func getAccessToken(credentialFile string) (string, error) {
 	// 	},
 	// 	TokenURL: google.JWTTokenURL,
 	// }
-
+	ctx, cancel := createContext()
+	defer cancel()
 	token, err := conf.TokenSource(ctx).Token()
 	if err != nil {
 		return "", err

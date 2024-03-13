@@ -17,7 +17,9 @@ func getClinicsHttp(writer http.ResponseWriter, request *http.Request) {
 	}
 	vals := jsonToMap(string(body))
 	userID := string(vals[userIdKey].(string))
-	data, err := getCompanies(ctx, client, userID)
+	ctx, cancel := createContext()
+	defer cancel()
+	data, err := getCompanies(ctx, gClient, userID)
 	if err != nil {
 		http.Error(writer, fmt.Sprint(err), http.StatusInternalServerError)
 		return
@@ -55,7 +57,7 @@ func runHttpApi(port int, maxClients int) {
 
 	logInfo.Printf("Starting HTTP server: %s with max clients: %d", httpAddress, maxClients)
 
-	http.HandleFunc("/getClinics", limitNumClients(getClinicsHttp, maxClients))
+	http.HandleFunc("GET /getCompanies", limitNumClients(getClinicsHttp, maxClients))
 	err := http.ListenAndServe(httpAddress, nil)
 	if err != nil {
 		logError.Print(err)
