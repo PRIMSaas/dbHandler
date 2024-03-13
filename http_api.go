@@ -57,7 +57,7 @@ func runHttpApi(port int, maxClients int) {
 
 	logInfo.Printf("Starting HTTP server: %s with max clients: %d", httpAddress, maxClients)
 
-	http.HandleFunc("GET /getCompanies", limitNumClients(getClinicsHttp, maxClients))
+	http.HandleFunc("/getCompanies", limitNumClients(getClinicsHttp, maxClients))
 	err := http.ListenAndServe(httpAddress, nil)
 	if err != nil {
 		logError.Print(err)
