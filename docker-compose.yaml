@@ -1,0 +1,7 @@
+ services:
+   server:
+     image: drjimdb:latest
+     volumes: 
+       - ./config:/config
+     ports:
+       - "8088:8088"

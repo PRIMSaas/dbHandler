@@ -15,7 +15,17 @@ func userExists(ctx context.Context, client *firestore.Client, userId string) (b
 		return false, fmt.Errorf("no user id")
 	}
 
-	_, err := client.Collection("users").Doc(userId).Get(ctx)
+	docs, err := client.Collection("users").Documents(ctx).GetAll()
+	if err != nil {
+		logError.Printf("Failed to retrieve documents: %v", err)
+	}
+
+	for _, doc := range docs {
+		fmt.Println("Document ID:", doc.Ref.ID)
+		fmt.Println("Document Data:", doc.Data())
+	}
+
+	_, err = client.Collection("users").Doc(userId).Get(ctx)
 	if err != nil && status.Code(err) == codes.NotFound {
 		return false, nil
 	} else if err != nil {
@@ -44,9 +54,9 @@ func deleteCollection(ctx context.Context, client *firestore.Client, collection 
 	if err != nil {
 		return fmt.Errorf("failed to get documents in collection %v: %w", collection.Path, err)
 	}
-	bw := client.BulkWriter(ctx) 
+	bw := client.BulkWriter(ctx)
 	for _, doc := range docs {
-		if _, err = bw.Delete(doc.Ref) ;err != nil { 
+		if _, err = bw.Delete(doc.Ref); err != nil {
 			return fmt.Errorf("failed to delete document %v: %w", doc.Ref.Path, err)
 		}
 	}

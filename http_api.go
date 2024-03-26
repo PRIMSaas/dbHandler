@@ -35,6 +35,35 @@ func getClinicsHttp(writer http.ResponseWriter, request *http.Request) {
 
 }
 
+func setCompaniesHttp(writer http.ResponseWriter, request *http.Request) {
+	body, err := io.ReadAll(request.Body)
+	if err != nil {
+		http.Error(writer, "Error reading request body", http.StatusInternalServerError)
+		return
+	}
+	vals := jsonToMap(string(body))
+	userID := string(vals[userIdKey].(string))
+	companies := jsonToCompanies("{}") //string(vals["companies"].(string)))
+	ctx, cancel := createContext()
+	defer cancel()
+	err = setCompanies(ctx, gClient, userID, companies)
+	if err != nil {
+		http.Error(writer, fmt.Sprint(err), http.StatusInternalServerError)
+	}
+}
+
+func jsonToCompanies(jsonStr string) []companyDetails {
+	//var result []companyDetails
+	//json.Unmarshal([]byte(jsonStr), &result)
+	initCompanies := []companyDetails{}
+	initCompanies = append(initCompanies, companyDetails{
+		Name:    "Test Clinic",
+		Address: "123 Test St",
+	})
+
+	return initCompanies
+}
+
 func jsonToMap(jsonStr string) map[string]interface{} {
 	result := make(map[string]interface{})
 	json.Unmarshal([]byte(jsonStr), &result)
@@ -57,7 +86,8 @@ func runHttpApi(port int, maxClients int) {
 
 	logInfo.Printf("Starting HTTP server: %s with max clients: %d", httpAddress, maxClients)
 
-	http.HandleFunc("/getCompanies", limitNumClients(getClinicsHttp, maxClients))
+	http.HandleFunc("/getCompanies", limitNumClients(getClinicsHttp2, maxClients))
+	http.HandleFunc("/setCompanies", limitNumClients(setCompaniesHttp, maxClients))
 	err := http.ListenAndServe(httpAddress, nil)
 	if err != nil {
 		logError.Print(err)

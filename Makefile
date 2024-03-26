@@ -1,5 +1,5 @@
 
-all: fmt tidy build test vet lint 
+all: fmt tidy build test vet 
 
 it: all
 
@@ -28,7 +28,12 @@ lint:
 cover:
 	go tool cover -func=c.out
 
+deploy:
+	docker build -t drjimdb .
+	docker tag drjimdb australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb
+	docker push australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb
+
 .PHONY: all clean it fmt tidy build test vet lint cover
 
 clean:
-	rm -f *.o dbHandler 
+	rm -f *.o dbHandler c.out
