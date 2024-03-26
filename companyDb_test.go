@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -36,7 +37,10 @@ func TestSetAndGetClinics(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	client := initClient(ctx)
+	secretPath := KEYPATH
+	keys := filepath.Join(secretPath, KEYFILE)
+
+	client := initClient(ctx, keys)
 
 	userId := "testUser"
 	// cleanup before start
@@ -76,8 +80,8 @@ func TestSetAndGetClinics(t *testing.T) {
 	fmt.Println("Test has finished successfully!")
 }
 
-func checkCompanies(t *testing.T, ctx context.Context, client *firestore.Client, 
-					userId string, companies []companyDetails) []companyDetails {
+func checkCompanies(t *testing.T, ctx context.Context, client *firestore.Client,
+	userId string, companies []companyDetails) []companyDetails {
 	err := setCompanies(ctx, client, userId, companies)
 	require.NoError(t, err)
 

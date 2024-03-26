@@ -9,6 +9,7 @@ import (
 
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/firebaseremoteconfig/v1"
+	"gopkg.in/yaml.v2"
 )
 
 const BASE_URL = "https://firebaseremoteconfig.googleapis.com"
@@ -29,11 +30,25 @@ type Parameter struct {
 type Value struct {
 	Value string `json:"value"`
 } */
+//
+// local config
+//
+type Properties struct {
+	Env string `yaml:"env"`
+}
 
+var properties Properties
+
+var configVals = map[string]string{} // local config
+// remote config
 var params map[string]firebaseremoteconfig.RemoteConfigParameter = make(map[string]firebaseremoteconfig.RemoteConfigParameter)
 
-func initConfig() {
-	token, err := getAccessToken(KEYFILE)
+func initConfig(keys string, config string) {
+	loadLocalConfig(config)
+	//
+	// Now load remote config
+	//
+	token, err := getAccessToken(keys)
 	if err != nil {
 		logError.Printf("Failed to get access token: %v", err)
 		return
@@ -54,14 +69,52 @@ func initConfig() {
 	params = remoteConfig.Parameters
 }
 
+func loadLocalConfig(config string) error {
+	file, err := os.Open(config)
+	if err != nil {
+		logError.Printf("Failed to load configuration file: %s", config)
+		return err
+	}
+
+	defer file.Close()
+
+	err = yaml.NewDecoder(file).Decode(&properties)
+	if err != nil {
+		logError.Printf("Failed to parse configuration file: %s", config)
+		return err
+	}
+
+	configStr, err := os.ReadFile(config)
+	if err != nil {
+		logError.Printf("Failed to load configuration file: %s", config)
+		return err
+	}
+	err = yaml.Unmarshal(configStr, configVals)
+	if err != nil {
+		logError.Printf("Failed to marshal configuration file to map: %s", config)
+		return err
+	}
+
+	return nil
+}
+
+// Search local value and if not found, search remote config
 func getConfig(key string, defaultVal string) string {
 
-	val, ok := params[key]
-	if !ok {
-		logError.Printf("%v key not found in remote config parameters", key)
-		return defaultVal
+	val, ok := configVals[key]
+	if ok {
+		logInfo.Printf("Found local config %v: %v", key, val)
+		return val
 	}
-	return val.DefaultValue.Value
+
+	logError.Printf("%v key not found in local config parameters", key)
+	remoteVal, ok := params[key]
+	if ok {
+		logInfo.Printf("Found remote config %v: %v", key, remoteVal.DefaultValue.Value)
+		return remoteVal.DefaultValue.Value
+	}
+	logError.Printf("%v key not found in remote config parameters", key)
+	return defaultVal
 }
 
 func getAccessToken(credentialFile string) (string, error) {

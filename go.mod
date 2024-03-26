@@ -4,17 +4,21 @@ go 1.21.1
 
 require (
 	cloud.google.com/go/firestore v1.14.0
+	firebase.google.com/go v3.13.0+incompatible
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/oauth2 v0.18.0
 	google.golang.org/api v0.168.0
 	google.golang.org/grpc v1.62.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
 	cloud.google.com/go v0.112.1 // indirect
 	cloud.google.com/go/compute v1.25.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	cloud.google.com/go/iam v1.1.6 // indirect
 	cloud.google.com/go/longrunning v0.5.5 // indirect
+	cloud.google.com/go/storage v1.38.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
