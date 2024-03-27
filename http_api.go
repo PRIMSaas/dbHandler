@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/rs/cors"
 )
 
 var userIdKey = "userId"
@@ -113,13 +115,22 @@ func limitNumClients(f http.HandlerFunc, maxClients int) http.HandlerFunc {
 func runHttpApi(port int, maxClients int) {
 	httpAddress := fmt.Sprintf("0.0.0.0:%d", port)
 
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://127.0.0.1:5055"},
+		AllowCredentials: true,
+		// Enable Debugging for testing, consider disabling in production
+		Debug: true,
+	})
+
 	logInfo.Printf("Starting HTTP server: %s with max clients: %d", httpAddress, maxClients)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/getCompanies", limitNumClients(getClinicsHttp2, maxClients))
+	mux.HandleFunc("/setCompanies", limitNumClients(setCompaniesHttp, maxClients))
+	// Insert the middleware
+	mux.HandleFunc("/processFile", processFile)
+	handler := c.Handler(mux)
 
-	http.HandleFunc("/getCompanies", limitNumClients(getClinicsHttp2, maxClients))
-	http.HandleFunc("/setCompanies", limitNumClients(setCompaniesHttp, maxClients))
-	http.HandleFunc("/processFile", processFile)
-
-	err := http.ListenAndServe(httpAddress, nil)
+	err := http.ListenAndServe(httpAddress, handler)
 	if err != nil {
 		logError.Print(err)
 	}
