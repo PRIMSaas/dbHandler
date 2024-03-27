@@ -3,5 +3,6 @@
      image: drjimdb:latest
      volumes: 
        - ./config:/config
+       - ./secret:/secret
      ports:
        - "8088:8088"
