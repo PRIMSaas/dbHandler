@@ -10,7 +10,24 @@ Tests require the firestore emulators to be running<br>
 
 It will start the emulator automatically if not running, but firebase has to be already installed <br>
 
-curl -i -d '{"userId":"wKWQbXhQatUA9aNYpEiAaRem0H3C"}' -X POST https://drjimdb3-5f6uwrh2eq-km.a.run.app/getCompanies <br>
+## Local container testing
+
+Build code with **make** <br>
+build container with **docker build -t drjimdb .** <br>
+Run container locally **docker compose up** <br><br>
+Install into cloud run: **make deploy**
+
+## Call APIs for testing
+Suggester order: 
+* Run code locally in debugger
+* containerise and run in local docker
+* deploy to cloud run
+<br><br>
+Test APIS - beware in cloud run you leave out the port number: <br>
+
+curl -i -d '{"fileContent":"This is an awesome file ...", "serviceCodes":["one", "two"]}' -X POST http://localhost:8088/processFile <br>
+
+curl -i -d '{"userId":"srfsyfuqPXfhigSTTkJFwvBs9Jb2"}' -X POST https://drjimdb3-5f6uwrh2eq-km.a.run.app/getCompanies <br>
 curl -i -d '{"userId":"srfsyfuqPXfhigSTTkJFwvBs9Jb2"}' -X POST https://drjimdb-5f6uwrh2eq-ts.a.run.app/getCompanies<br>
 
 <br>

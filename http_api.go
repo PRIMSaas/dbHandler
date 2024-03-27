@@ -52,6 +52,35 @@ func setCompaniesHttp(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
+func processFile(writer http.ResponseWriter, request *http.Request) {
+	body, err := io.ReadAll(request.Body)
+	if err != nil {
+		errs := fmt.Sprintf("Error reading request body: %v", err)
+		http.Error(writer, errs, http.StatusInternalServerError)
+		return
+	}
+	file := PaymentFile{}
+	err = json.Unmarshal(body, &file)
+	if err != nil {
+		errs := fmt.Sprintf("Error parsing json body: %v", err)
+		http.Error(writer, errs, http.StatusInternalServerError)
+		return
+	}
+	resp, err := processFileContent(file)
+	if err != nil {
+		http.Error(writer, fmt.Sprint(err), http.StatusInternalServerError)
+	}
+	// Set the Content-Type header to application/json
+	writer.Header().Set("Content-Type", "application/json")
+
+	// Use json.NewEncoder to write the data to the response writer
+	err = json.NewEncoder(writer).Encode(resp)
+	if err != nil {
+		http.Error(writer, "Error encoding response body", http.StatusInternalServerError)
+	}
+
+}
+
 func jsonToCompanies(jsonStr string) []companyDetails {
 	//var result []companyDetails
 	//json.Unmarshal([]byte(jsonStr), &result)
@@ -88,6 +117,8 @@ func runHttpApi(port int, maxClients int) {
 
 	http.HandleFunc("/getCompanies", limitNumClients(getClinicsHttp2, maxClients))
 	http.HandleFunc("/setCompanies", limitNumClients(setCompaniesHttp, maxClients))
+	http.HandleFunc("/processFile", processFile)
+
 	err := http.ListenAndServe(httpAddress, nil)
 	if err != nil {
 		logError.Print(err)
