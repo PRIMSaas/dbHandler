@@ -116,7 +116,7 @@ func runHttpApi(port int, maxClients int) {
 	httpAddress := fmt.Sprintf("0.0.0.0:%d", port)
 
 	c := cors.New(cors.Options{
-		AllowedOrigins:   []string{"http://127.0.0.1:5055"},
+		AllowedOrigins:   []string{"http://127.0.0.1:5055", "*"},
 		AllowCredentials: true,
 		// Enable Debugging for testing, consider disabling in production
 		Debug: true,
@@ -126,7 +126,6 @@ func runHttpApi(port int, maxClients int) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/getCompanies", limitNumClients(getClinicsHttp2, maxClients))
 	mux.HandleFunc("/setCompanies", limitNumClients(setCompaniesHttp, maxClients))
-	// Insert the middleware
 	mux.HandleFunc("/processFile", processFile)
 	handler := c.Handler(mux)
 
