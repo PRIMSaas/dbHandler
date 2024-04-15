@@ -2,28 +2,16 @@ package main
 
 import (
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"strings"
 )
 
-type Service struct {
-	Code        string `json:"code"`
-	Description string `json:"description"`
-}
-
 type ServiceCut struct {
-	Scode      Service
-	Percentage string
-}
-type Provider struct {
-	Provider    string `json:"providerName"`
-	ServiceCuts map[string]ServiceCut
-	Items       map[int]ServiceCut
-	Employer    string `json:"employer"`
-	ProviderId  string `json:"providerId"`
-	Feedback    string `json:"feedback"`
+	Code       string `json:"code"`
+	Percentage string `json:"percentage"`
 }
 
 /*
@@ -52,7 +40,7 @@ type PaymentFile struct {
 	FileContent  string                       `json:"fileContent"`
 	CsvLineStart int                          `json:"noneCsvLines"`
 	CompanyName  string                       `json:"companyName"`
-	CodeMap      []map[string][]string        `json:"codeMap"`
+	CodeMap      map[string][]string          `json:"codeMap"`
 	PracMap      map[string]map[string]string `json:"pracMap"`
 }
 
@@ -64,6 +52,19 @@ type PaymentFileResponse struct {
 	Service   ServiceCut `json:"service"`
 	Payment   string     `json:"payment"`
 	Billed    string     `json:"billed"`
+}
+
+var (
+	ErrAmount     = errors.New("invalid amount")
+	ErrPercentage = errors.New("invalid percentage")
+)
+
+type NumberError struct {
+	Type error
+}
+
+func (p *NumberError) Error() string {
+	return fmt.Errorf("error converting value because: %w", p.Type).Error()
 }
 
 // IF:
@@ -122,7 +123,7 @@ func processFileContent(content PaymentFile) ([]PaymentFileResponse, error) {
 		ok := false
 		if serviceCode, ok = itemMap[record[itemNo]]; !ok {
 			return res,
-				fmt.Errorf("item number: %v in line: %v is not in the item database", record[itemNo], i+content.CsvLineStart)
+				fmt.Errorf("item number: %v in line: %v not associated with a Service Code", record[itemNo], i+content.CsvLineStart)
 		}
 		providerServiceCodes := map[string]string{}
 		if providerServiceCodes, ok = content.PracMap[record[provider]]; !ok {
@@ -137,7 +138,16 @@ func processFileContent(content PaymentFile) ([]PaymentFileResponse, error) {
 		}
 		billed, err := calcPayment(record[payment], serviceCut)
 		if err != nil {
-			return res, fmt.Errorf("error converting billed amount in line: %v: %v", i+content.CsvLineStart, err)
+			if errors.Is(err, ErrAmount) {
+				return res, fmt.Errorf("provider: %v in line: %v value: %v. Cause: %w",
+					record[provider], i+content.CsvLineStart, record[payment], err)
+			} else if errors.Is(err, ErrPercentage) {
+				return res, fmt.Errorf("provider: %v in line: %v value: %v. Cause: %w",
+					record[provider], i+content.CsvLineStart, serviceCut, err)
+			}
+			return res,
+				fmt.Errorf("provider: %v in line: %v with amount: %v and parcentage %v failed due to unknown error: %v",
+					record[provider], i+content.CsvLineStart, record[payment], serviceCut, err)
 		}
 		result := PaymentFileResponse{
 			Provider:  record[provider],
@@ -145,7 +155,7 @@ func processFileContent(content PaymentFile) ([]PaymentFileResponse, error) {
 			InvoiceNo: record[invoiceNr],
 			ItemNo:    record[itemNo],
 			Service: ServiceCut{
-				Scode:      Service{Code: serviceCode, Description: ""},
+				Code:       serviceCode,
 				Percentage: serviceCut,
 			},
 			Payment: record[payment],
@@ -175,15 +185,13 @@ func truncateCsv(content string, noneCsvLines int) (string, error) {
 	return content[index:], nil
 }
 
-// input: CodeMap: []map[string][]string{{"code1": {"123", "456"}}, {"code2": {"789", "012"}}}
+// input: CodeMap: map[string][]string{"code1": {"123", "456"}}, {"code2": {"789", "012"}}
 // output: map[string]string{"123": "code1", "456": "code1", "789": "code2", "012": "code2"}
-func createItemMap(itemMap []map[string][]string) map[string]string {
+func createItemMap(itemMap map[string][]string) map[string]string {
 	result := make(map[string]string)
-	for _, mappings := range itemMap {
-		for serviceCode, items := range mappings {
-			for _, itemNr := range items {
-				result[itemNr] = serviceCode
-			}
+	for serviceCode, items := range itemMap {
+		for _, itemNr := range items {
+			result[itemNr] = serviceCode
 		}
 	}
 	return result
@@ -192,15 +200,15 @@ func createItemMap(itemMap []map[string][]string) map[string]string {
 func calcPayment(payment string, percentage string) (string, error) {
 	p, err := convertToFloat(payment)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w %w", ErrAmount, err)
 	}
 	perc, err := convertPercToFloat(percentage)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w %w", ErrPercentage, err)
 	}
 	partPay := p
 	if perc <= 0 {
-		return "", fmt.Errorf("error percantage is: %v", perc)
+		return "", fmt.Errorf("%w %w", ErrPercentage, fmt.Errorf("percentage value must be greater than 0"))
 	}
 	partPay = math.Round(p*perc) / 100
 	return fmt.Sprintf("%.2f", partPay), nil
@@ -209,7 +217,7 @@ func calcPayment(payment string, percentage string) (string, error) {
 func convertToFloat(value string) (float64, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
-		return 0, nil
+		return 0, fmt.Errorf("field is blank")
 	}
 	factor := 1
 	if value[0] == '(' {
@@ -219,7 +227,7 @@ func convertToFloat(value string) (float64, error) {
 	}
 	num, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		return 0, fmt.Errorf("error converting payment value: %v", err)
+		return 0, fmt.Errorf("error converting value")
 	}
 	return num * float64(factor), nil
 }
@@ -227,52 +235,4 @@ func convertToFloat(value string) (float64, error) {
 func convertPercToFloat(value string) (float64, error) {
 	value = strings.ReplaceAll(value, "%", "")
 	return convertToFloat(value)
-}
-
-func convertPayment(value string) (int, int, error) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return 0, 0, nil
-	}
-	factor := 1
-	if value[0] == '(' {
-		factor = -1
-		value = strings.ReplaceAll(value, "(", "")
-		value = strings.ReplaceAll(value, ")", "")
-	}
-	i := strings.Index(value, ".")
-	decimal := 0
-	if i > 0 {
-		decimal = len(value) - i - 1
-	}
-	value = strings.ReplaceAll(value, ".", "")
-	num, err := strconv.Atoi(value)
-	if err != nil {
-		return 0, 0, fmt.Errorf("error converting payment value: %v", err)
-	}
-	return num * factor, decimal, nil
-}
-
-func convertPerc(value string) (float64, error) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return 0, nil
-	}
-	value = strings.ReplaceAll(value, "%", "")
-
-	val, fact, err := convertPayment(value)
-	if err != nil {
-		return 0, fmt.Errorf("error converting percentage value: %v", err)
-	}
-	if val < 0 {
-		return 0, fmt.Errorf("percentage value cannot be negative")
-	}
-	if val == 0 {
-		return 0, nil
-	}
-	factor := 100
-	if fact > 0 {
-		factor = int(math.Pow10(fact)) * 100
-	}
-	return float64(val / factor), nil
 }
