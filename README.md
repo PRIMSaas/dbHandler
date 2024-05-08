@@ -10,7 +10,24 @@ Tests require the firestore emulators to be running<br>
 
 It will start the emulator automatically if not running, but firebase has to be already installed <br>
 
-curl -i -d '{"userId":"wKWQbXhQatUA9aNYpEiAaRem0H3C"}' -X POST https://drjimdb3-5f6uwrh2eq-km.a.run.app/getCompanies <br>
+## Local container testing
+
+Build code with **make** <br>
+build container with **docker build -t drjimdb .** <br>
+Run container locally **docker compose up** <br><br>
+Install into cloud run: **make deploy**
+
+## Call APIs for testing
+Suggester order: 
+* Run code locally in debugger
+* containerise and run in local docker
+* deploy to cloud run
+<br><br>
+Test APIS - beware in cloud run you leave out the port number: <br>
+
+curl -i -d '{"fileContent":"This is an awesome file ...", "serviceCodes":["one", "two"]}' -X POST http://localhost:8088/processFile <br>
+
+curl -i -d '{"userId":"srfsyfuqPXfhigSTTkJFwvBs9Jb2"}' -X POST https://drjimdb3-5f6uwrh2eq-km.a.run.app/getCompanies <br>
 curl -i -d '{"userId":"srfsyfuqPXfhigSTTkJFwvBs9Jb2"}' -X POST https://drjimdb-5f6uwrh2eq-ts.a.run.app/getCompanies<br>
 
 <br>
@@ -32,4 +49,15 @@ container run: <br>
 docker compose up <br>
 docker run --entrypoint /bin/bash -it drjimdb <br>
 
+## Calculations to be performed
+The input file is layed out like this:<br>
+Location 0 A, Provider 1 B, Billed To 2 C, Patient Name 3 D, Invoice No. 4 E, Service ID 5 F, Payment ID 6 G, Item No. 7 H, Description 8 I, Status 9 J, Transaction Date 10 k, Payment Method 11 L, Account Type 12 M, "GST( incl GST)" 13 N, "Payment( incl GST)" 14 O, "Deposit($ incl GST)" 15 P<br>
+Need to pass in: <br>
+the file content as a string<br>
+the line number where the data starts<br>
+the name of the company <br>
+A CodeMap which is a map of service code to a list of item numbers it covers<br>
+A PracMap which is a map of providers to a map of service codes and their respective percentage<br>
+
+The item number in the file is mapped to a service code and the percentage for that service code is given per provider<br>
 
