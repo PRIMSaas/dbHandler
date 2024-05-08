@@ -9,51 +9,6 @@ import (
 	"github.com/rs/cors"
 )
 
-var userIdKey = "userId"
-
-func getClinicsHttp(writer http.ResponseWriter, request *http.Request) {
-	body, err := io.ReadAll(request.Body)
-	if err != nil {
-		http.Error(writer, "Error reading request body", http.StatusInternalServerError)
-		return
-	}
-	vals := jsonToMap(string(body))
-	userID := string(vals[userIdKey].(string))
-	ctx, cancel := createContext()
-	defer cancel()
-	data, err := getCompanies(ctx, gClient, userID)
-	if err != nil {
-		http.Error(writer, fmt.Sprint(err), http.StatusInternalServerError)
-		return
-	}
-	// Set the Content-Type header to application/json
-	writer.Header().Set("Content-Type", "application/json")
-
-	// Use json.NewEncoder to write the data to the response writer
-	err = json.NewEncoder(writer).Encode(data)
-	if err != nil {
-		http.Error(writer, "Error encoding response body", http.StatusInternalServerError)
-	}
-
-}
-
-func setCompaniesHttp(writer http.ResponseWriter, request *http.Request) {
-	body, err := io.ReadAll(request.Body)
-	if err != nil {
-		http.Error(writer, "Error reading request body", http.StatusInternalServerError)
-		return
-	}
-	vals := jsonToMap(string(body))
-	userID := string(vals[userIdKey].(string))
-	companies := jsonToCompanies("{}") //string(vals["companies"].(string)))
-	ctx, cancel := createContext()
-	defer cancel()
-	err = setCompanies(ctx, gClient, userID, companies)
-	if err != nil {
-		http.Error(writer, fmt.Sprint(err), http.StatusInternalServerError)
-	}
-}
-
 func processFile(writer http.ResponseWriter, request *http.Request) {
 	body, err := io.ReadAll(request.Body)
 	if err != nil {
@@ -69,47 +24,19 @@ func processFile(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	resp, err := processFileContent(file)
+	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
 		http.Error(writer, fmt.Sprint(err), http.StatusInternalServerError)
+		return
 	}
-	// Set the Content-Type header to application/json
-	writer.Header().Set("Content-Type", "application/json")
 
-	// Use json.NewEncoder to write the data to the response writer
 	err = json.NewEncoder(writer).Encode(resp)
 	if err != nil {
 		http.Error(writer, "Error encoding response body", http.StatusInternalServerError)
+		return
 	}
-
-}
-
-func jsonToCompanies(jsonStr string) []companyDetails {
-	//var result []companyDetails
-	//json.Unmarshal([]byte(jsonStr), &result)
-	initCompanies := []companyDetails{}
-	initCompanies = append(initCompanies, companyDetails{
-		Name:    "Test Clinic",
-		Address: "123 Test St",
-	})
-
-	return initCompanies
-}
-
-func jsonToMap(jsonStr string) map[string]interface{} {
-	result := make(map[string]interface{})
-	json.Unmarshal([]byte(jsonStr), &result)
-	return result
-}
-
-func limitNumClients(f http.HandlerFunc, maxClients int) http.HandlerFunc {
-	// Counting semaphore using a buffered channel
-	sema := make(chan struct{}, maxClients)
-
-	return func(w http.ResponseWriter, req *http.Request) {
-		sema <- struct{}{}
-		defer func() { <-sema }()
-		f(w, req)
-	}
+	// On success, set the Content-Type header to application/json
+	writer.Header().Set("Content-Type", "application/json")
 }
 
 func runHttpApi(port int, maxClients int) {
@@ -124,8 +51,6 @@ func runHttpApi(port int, maxClients int) {
 
 	logInfo.Printf("Starting HTTP server: %s with max clients: %d", httpAddress, maxClients)
 	mux := http.NewServeMux()
-	mux.HandleFunc("/getCompanies", limitNumClients(getClinicsHttp2, maxClients))
-	mux.HandleFunc("/setCompanies", limitNumClients(setCompaniesHttp, maxClients))
 	mux.HandleFunc("/processFile", processFile)
 	handler := c.Handler(mux)
 
