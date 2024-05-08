@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -19,10 +18,10 @@ func ReadTestFile(fileName string) (string, error) {
 
 func TestCalculate1(t *testing.T) {
 	dr1 := "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50),0.00"
-	dr2 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,91182,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
+	//dr2 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,91182,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
 
 	paymentFile := PaymentFile{
-		FileContent:  dr1 + "\n" + dr2,
+		FileContent:  dr1, //+ "\n" + dr2,
 		CsvLineStart: 0,
 		CompanyName:  "A Practice",
 		CodeMap:      map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
@@ -40,13 +39,13 @@ func TestCalculate1(t *testing.T) {
 }
 
 func TestCalcErrorItemMappingServiceCode(t *testing.T) {
-
+	configureLogging()
 	goodCode := "code1"
 	dr1 := "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50),0.00"
-	dr2 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,91182,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
+	//dr2 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,91182,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
 
 	paymentFile := PaymentFile{
-		FileContent:  dr1 + "\n" + dr2,
+		FileContent:  dr1, // + "\n" + dr2,
 		CsvLineStart: 0,
 		CompanyName:  "A Practice",
 		CodeMap:      map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
@@ -59,8 +58,8 @@ func TestCalcErrorItemMappingServiceCode(t *testing.T) {
 	delete(paymentFile.CodeMap, goodCode)
 	paymentFile.CodeMap[goodCode] = []string{"80011", "456"}
 	res, err := processFileContent(paymentFile)
-	require.Error(t, err)
-	require.Empty(t, res)
+	require.NoError(t, err)
+	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
 	// restore
 	delete(paymentFile.CodeMap, goodCode)
 	paymentFile.CodeMap[goodCode] = []string{"80010", "456"}
@@ -69,8 +68,8 @@ func TestCalcErrorItemMappingServiceCode(t *testing.T) {
 	//
 	delete(paymentFile.PracMap, "Dr Aha")
 	res, err = processFileContent(paymentFile)
-	require.Error(t, err)
-	require.Empty(t, res)
+	require.NoError(t, err)
+	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
 	// restore
 	paymentFile.PracMap["Dr Aha"] = map[string]string{"code1": "30", "code2": "20"}
 	//
@@ -78,8 +77,8 @@ func TestCalcErrorItemMappingServiceCode(t *testing.T) {
 	//
 	delete(paymentFile.PracMap["Dr Aha"], goodCode)
 	res, err = processFileContent(paymentFile)
-	require.Error(t, err)
-	require.Empty(t, res)
+	require.NoError(t, err)
+	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
 	// restore the good code
 	paymentFile.PracMap["Dr Aha"][goodCode] = "30"
 }
@@ -88,10 +87,10 @@ func TestCalcErrorBadNumbers(t *testing.T) {
 
 	goodCode := "code1"
 	dr1 := "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50),0.00"
-	dr2 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,91182,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
+	//dr2 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,91182,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
 
 	paymentFile := PaymentFile{
-		FileContent:  dr1 + "\n" + dr2,
+		FileContent:  dr1, // + "\n" + dr2,
 		CsvLineStart: 0,
 		CompanyName:  "A Practice",
 		CodeMap:      map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
@@ -104,30 +103,26 @@ func TestCalcErrorBadNumbers(t *testing.T) {
 	delete(paymentFile.PracMap["Dr Aha"], goodCode)
 	paymentFile.PracMap["Dr Aha"][goodCode] = "hello"
 	res, err := processFileContent(paymentFile)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrPercentage))
-	require.Empty(t, res)
+	require.NoError(t, err)
+	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
 	// blank percentage
 	delete(paymentFile.PracMap["Dr Aha"], goodCode)
 	paymentFile.PracMap["Dr Aha"][goodCode] = ""
 	res, err = processFileContent(paymentFile)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrPercentage))
-	require.Empty(t, res)
+	require.NoError(t, err)
+	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
 	// restore the good code
 	paymentFile.PracMap["Dr Aha"][goodCode] = "30"
 	// bad payment
 	paymentFile.FileContent = "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50.50),0.00"
 	res, err = processFileContent(paymentFile)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrAmount))
-	require.Empty(t, res)
+	require.NoError(t, err)
+	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
 	// blank payment
 	paymentFile.FileContent = "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,,0.00"
 	res, err = processFileContent(paymentFile)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, ErrAmount))
-	require.Empty(t, res)
+	require.NoError(t, err)
+	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
 }
 
 func TestConvertPayment(t *testing.T) {

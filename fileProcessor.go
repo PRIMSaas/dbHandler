@@ -38,34 +38,31 @@ json payload
 */
 type PaymentFile struct {
 	FileContent  string                       `json:"fileContent"`
-	CsvLineStart int                          `json:"noneCsvLines"`
+	CsvLineStart int                          `json:"csvLineStart"`
 	CompanyName  string                       `json:"companyName"`
 	CodeMap      map[string][]string          `json:"codeMap"`
 	PracMap      map[string]map[string]string `json:"pracMap"`
 }
 
+type FileError struct {
+	ErrorMsg string `json:"msg"`
+}
+
 type PaymentFileResponse struct {
-	Provider  string     `json:"provider"`
-	Patient   string     `json:"patient"`
-	InvoiceNo string     `json:"invoiceNo"`
-	ItemNo    string     `json:"itemNo"`
-	Service   ServiceCut `json:"service"`
-	Payment   string     `json:"payment"`
-	Billed    string     `json:"billed"`
+	Provider     string     `json:"provider"`
+	Patient      string     `json:"patient"`
+	InvoiceNo    string     `json:"invoiceNo"`
+	ItemNo       string     `json:"ItemNo"`
+	Service      ServiceCut `json:"service"`
+	Payment      string     `json:"payment"`
+	Billed       string     `json:"billed"`
+	ProcessError FileError  `json:"error"`
 }
 
 var (
 	ErrAmount     = errors.New("invalid amount")
 	ErrPercentage = errors.New("invalid percentage")
 )
-
-type NumberError struct {
-	Type error
-}
-
-func (p *NumberError) Error() string {
-	return fmt.Errorf("error converting value because: %w", p.Type).Error()
-}
 
 // IF:
 // Providers present in report but not in provider database
@@ -82,17 +79,17 @@ func (p *NumberError) Error() string {
 // Location, Provider, Billed, To, Patient Name, Invoice No., Service ID, Payment ID, Item No., Description,
 // Status, Transaction, Date, Payment Method, Account Type, GST ($ incl GST), Payment ($ incl GST), Deposit ($ incl GST)
 //
-// Required: 0 Location, 1 Provider, 8 ItemNo, 9 Description, 15 GST, 16 Payment, 17 Deposit
+// Required: 0 Location, 1 Provider, 8 itemNum, 9 Description, 15 GST, 16 Payment, 17 Deposit
 // Location,Provider,Billed To,Patient Name,Invoice No.,Service ID,Payment ID,Item No.,Description,Status,Transaction Date,Payment Method,Account Type,"GST
 // ClinicName,Dr Phoebe Kho,Irrelevant,Patient Name,162307,174545,71756,80010,"Clinical psychologist consultation, >50 min, consulting rooms",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50),0.00
 
 func processFileContent(content PaymentFile) ([]PaymentFileResponse, error) {
 
-	location := 0
+	//location := 0
 	provider := 1
 	patient := 3
-	invoiceNr := 4
-	itemNo := 7
+	invoiceNum := 4
+	itemNum := 7
 	//description := 8
 	//GST := 13
 	payment := 14
@@ -103,57 +100,65 @@ func processFileContent(content PaymentFile) ([]PaymentFileResponse, error) {
 	if err != nil {
 		return res, err
 	}
-
 	reader := csv.NewReader(strings.NewReader(s))
 	records, err := reader.ReadAll()
 	if err != nil {
-		s := fmt.Sprintf("Reading csv file failed with error: %v", err)
-		logError.Printf(s)
-		return res, fmt.Errorf(s)
+		return processError(fmt.Sprintf("Reading csv file failed with error: %v", err), res), nil
 	}
 	itemMap := createItemMap(content.CodeMap)
 
-	for i, record := range records {
-		// Check if the company name is in the record
-		// is the same as in the request, if not skip
-		if !compareNames(record[location], content.CompanyName) {
+	lineNum := content.CsvLineStart
+	for _, record := range records {
+		lineNum++
+		//
+		// Skip blank lines
+		//
+		prov := strings.TrimSpace(record[provider])
+		if prov == "" {
 			continue
 		}
-		serviceCode := ""
-		ok := false
-		if serviceCode, ok = itemMap[record[itemNo]]; !ok {
-			return res,
-				fmt.Errorf("item number: %v in line: %v not associated with a Service Code", record[itemNo], i+content.CsvLineStart)
+		// Check if the company name is in the record
+		// is the same as in the request, if not skip
+		//	if !compareNames(record[location], content.CompanyName) {
+		//		continue
+		//	}
+		// providerServiceCodes := map[string]string{}
+		providerServiceCodes, ok := content.PracMap[prov]
+		if !ok {
+			res = processError(fmt.Sprintf("provider: %v in line: %v has not bee configured", record[provider], lineNum), res)
+			continue
 		}
-		providerServiceCodes := map[string]string{}
-		if providerServiceCodes, ok = content.PracMap[record[provider]]; !ok {
-			return res,
-				fmt.Errorf("provider: %v in line: %v has no service codes assigned", record[provider], i+content.CsvLineStart)
+		serviceCode, ok := itemMap[strings.TrimSpace(record[itemNum])]
+		if !ok {
+			res = processError(fmt.Sprintf("item number: %v in line: %v not associated with a Service Code", record[itemNum], lineNum), res)
+			continue
 		}
-		serviceCut := ""
-		if serviceCut, ok = providerServiceCodes[serviceCode]; !ok {
-			return res,
-				fmt.Errorf("provider: %v in line: %v has no service cut assigned for service code: %v",
-					record[provider], i+content.CsvLineStart, serviceCode)
+		serviceCut, ok := providerServiceCodes[serviceCode]
+		if !ok {
+			res = processError(fmt.Sprintf("provider: %v in line: %v has no service cut assigned for service code: %v",
+				record[provider], lineNum, serviceCode), res)
+			continue
 		}
 		billed, err := calcPayment(record[payment], serviceCut)
 		if err != nil {
 			if errors.Is(err, ErrAmount) {
-				return res, fmt.Errorf("provider: %v in line: %v value: %v. Cause: %w",
-					record[provider], i+content.CsvLineStart, record[payment], err)
+				res = processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
+					record[provider], lineNum, record[payment], err.Error()), res)
+				continue
 			} else if errors.Is(err, ErrPercentage) {
-				return res, fmt.Errorf("provider: %v in line: %v value: %v. Cause: %w",
-					record[provider], i+content.CsvLineStart, serviceCut, err)
+				res = processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
+					record[provider], lineNum, serviceCut, err.Error()), res)
+				continue
 			}
-			return res,
-				fmt.Errorf("provider: %v in line: %v with amount: %v and parcentage %v failed due to unknown error: %v",
-					record[provider], i+content.CsvLineStart, record[payment], serviceCut, err)
+			res = processError(fmt.Sprintf("provider: %v in line: %v with amount: %v and parcentage %v failed due to unknown error: %v",
+				record[provider], lineNum, record[payment], serviceCut, err.Error()), res)
+			continue
 		}
 		result := PaymentFileResponse{
 			Provider:  record[provider],
 			Patient:   record[patient],
-			InvoiceNo: record[invoiceNr],
-			ItemNo:    record[itemNo],
+			InvoiceNo: record[invoiceNum],
+			ItemNo:    record[itemNum],
 			Service: ServiceCut{
 				Code:       serviceCode,
 				Percentage: serviceCut,
@@ -166,6 +171,13 @@ func processFileContent(content PaymentFile) ([]PaymentFileResponse, error) {
 	return res, nil
 }
 
+func processError(err string, resp []PaymentFileResponse) []PaymentFileResponse {
+	res := PaymentFileResponse{}
+	res.ProcessError.ErrorMsg = err
+	logError.Printf(err)
+	return append(resp, res)
+
+}
 func compareNames(name1, name2 string) bool {
 	return strings.Contains(strings.ToLower(strings.ReplaceAll(name1, " ", "")),
 		strings.ToLower(strings.ReplaceAll(name2, " ", "")))
