@@ -27,14 +27,14 @@ func TestCalculate1(t *testing.T) {
 		CodeMap:      map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
 		PracMap:      map[string]map[string]string{"Dr Aha": {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
 	}
-	var res []PaymentFileResponse
+	var res FileProcessingResponse
 	res, err := processFileContent(paymentFile)
 	require.NoError(t, err)
-	require.Equal(t, "Dr Aha", res[0].Provider)
-	require.Equal(t, "Sick Patient", res[0].Patient)
-	require.Equal(t, "80010", res[0].ItemNo)
-	require.Equal(t, "(224.50)", res[0].Payment)
-	require.Equal(t, "-67.35", res[0].Billed)
+	require.Equal(t, "Dr Aha", res.ChargeDetail[0].Provider)
+	require.Equal(t, "Sick Patient", res.ChargeDetail[0].Patient)
+	require.Equal(t, "80010", res.ChargeDetail[0].ItemNo)
+	require.Equal(t, "(224.50)", res.ChargeDetail[0].Payment)
+	require.Equal(t, "-67.35", res.ChargeDetail[0].ServiceFee)
 	require.NotEmpty(t, res)
 }
 
@@ -44,14 +44,15 @@ func TestCalcErrorItemMappingServiceCode(t *testing.T) {
 	dr1 := "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50),0.00"
 	//dr2 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,91182,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
 
+	drName := "Dr Aha"
 	paymentFile := PaymentFile{
 		FileContent:  dr1, // + "\n" + dr2,
 		CsvLineStart: 0,
 		CompanyName:  "A Practice",
 		CodeMap:      map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
-		PracMap:      map[string]map[string]string{"Dr Aha": {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
+		PracMap:      map[string]map[string]string{drName: {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
 	}
-	var res []PaymentFileResponse
+	var res FileProcessingResponse
 	//
 	// invalid item number
 	//
@@ -59,32 +60,37 @@ func TestCalcErrorItemMappingServiceCode(t *testing.T) {
 	paymentFile.CodeMap[goodCode] = []string{"80011", "456"}
 	res, err := processFileContent(paymentFile)
 	require.NoError(t, err)
-	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
+	_, ok := res.MissingItemNrs["80010"]
+	require.True(t, ok)
 	// restore
 	delete(paymentFile.CodeMap, goodCode)
 	paymentFile.CodeMap[goodCode] = []string{"80010", "456"}
 	//
 	// Dr missing service code mapping
 	//
-	delete(paymentFile.PracMap, "Dr Aha")
+	delete(paymentFile.PracMap, drName)
 	res, err = processFileContent(paymentFile)
 	require.NoError(t, err)
-	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
+	_, ok = res.MissingProviders[drName]
+	require.True(t, ok)
 	// restore
-	paymentFile.PracMap["Dr Aha"] = map[string]string{"code1": "30", "code2": "20"}
+	paymentFile.PracMap[drName] = map[string]string{"code1": "30", "code2": "20"}
 	//
 	// Missing service code for Dr
 	//
-	delete(paymentFile.PracMap["Dr Aha"], goodCode)
+	delete(paymentFile.PracMap[drName], goodCode)
 	res, err = processFileContent(paymentFile)
 	require.NoError(t, err)
-	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
+	_, ok = res.MissingServiceCodes[drName]
+	require.True(t, ok)
 	// restore the good code
-	paymentFile.PracMap["Dr Aha"][goodCode] = "30"
+	paymentFile.PracMap[drName][goodCode] = "30"
 }
 
 func TestCalcErrorBadNumbers(t *testing.T) {
 
+	configureLogging()
+	drName := "Dr Aha"
 	goodCode := "code1"
 	dr1 := "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50),0.00"
 	//dr2 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,91182,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
@@ -94,35 +100,35 @@ func TestCalcErrorBadNumbers(t *testing.T) {
 		CsvLineStart: 0,
 		CompanyName:  "A Practice",
 		CodeMap:      map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
-		PracMap:      map[string]map[string]string{"Dr Aha": {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
+		PracMap:      map[string]map[string]string{drName: {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
 	}
-	var res []PaymentFileResponse
+	var res FileProcessingResponse //[]PaymentFileResponse
 	//
 	// Missing service code for Dr
 	//
-	delete(paymentFile.PracMap["Dr Aha"], goodCode)
-	paymentFile.PracMap["Dr Aha"][goodCode] = "hello"
+	delete(paymentFile.PracMap[drName], goodCode)
+	paymentFile.PracMap[drName][goodCode] = "hello"
 	res, err := processFileContent(paymentFile)
 	require.NoError(t, err)
-	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
+	require.NotEmpty(t, res.ChargeDetail[0].ErrorMsg)
 	// blank percentage
-	delete(paymentFile.PracMap["Dr Aha"], goodCode)
-	paymentFile.PracMap["Dr Aha"][goodCode] = ""
+	delete(paymentFile.PracMap[drName], goodCode)
+	paymentFile.PracMap[drName][goodCode] = ""
 	res, err = processFileContent(paymentFile)
 	require.NoError(t, err)
-	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
+	require.NotEmpty(t, res.ChargeDetail[0].ErrorMsg)
 	// restore the good code
-	paymentFile.PracMap["Dr Aha"][goodCode] = "30"
+	paymentFile.PracMap[drName][goodCode] = "30"
 	// bad payment
 	paymentFile.FileContent = "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50.50),0.00"
 	res, err = processFileContent(paymentFile)
 	require.NoError(t, err)
-	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
+	require.NotEmpty(t, res.ChargeDetail[0].ErrorMsg)
 	// blank payment
 	paymentFile.FileContent = "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,,0.00"
 	res, err = processFileContent(paymentFile)
 	require.NoError(t, err)
-	require.NotEmpty(t, res[0].ProcessError.ErrorMsg)
+	require.NotEmpty(t, res.ChargeDetail[0].ErrorMsg)
 }
 
 func TestConvertPayment(t *testing.T) {
@@ -213,6 +219,23 @@ func TestCompareNames(t *testing.T) {
 	}
 	for _, test := range tests {
 		res := compareNames(test.name1, test.name2)
+		require.Equal(t, test.output, res)
+	}
+}
+
+func TestStandardString(t *testing.T) {
+	tests := []struct {
+		input  string
+		output string
+	}{
+		{"Vermont Medical Clinic", "vermont medical clinic"},
+		{"Vermont Medical Clinic [no bulk-billing]", "vermont medical clinic [no bulk-billing]"},
+		{"Vermont Medical    Clinic [no bulk-billing]", "vermont medical clinic [no bulk-billing]"},
+		{"Vermont Medical \t Clinic [no bulk-billing]", "vermont medical clinic [no bulk-billing]"},
+		{"  Vermont    Medical Clinic", "vermont medical clinic"},
+	}
+	for _, test := range tests {
+		res := standardString(test.input)
 		require.Equal(t, test.output, res)
 	}
 }

@@ -28,8 +28,10 @@ lint:
 cover:
 	go tool cover -func=c.out
 
-deploy:
+local:
 	docker build -t drjimdb .
+
+deploy:	local
 	docker tag drjimdb australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb
 	docker push australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb
 

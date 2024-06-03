@@ -44,19 +44,23 @@ type PaymentFile struct {
 	PracMap      map[string]map[string]string `json:"pracMap"`
 }
 
-type FileError struct {
-	ErrorMsg string `json:"msg"`
+type FileProcessingResponse struct {
+	MissingProviders    map[string]string            `json:"missingProviders"`
+	MissingItemNrs      map[string]string            `json:"missingItemNrs"`
+	MissingServiceCodes map[string]map[string]string `json:"missingServiceCodes"`
+	ChargeDetail        []PaymentFileResponse        `json:"chargeDetail"`
 }
 
 type PaymentFileResponse struct {
-	Provider     string     `json:"provider"`
-	Patient      string     `json:"patient"`
-	InvoiceNo    string     `json:"invoiceNo"`
-	ItemNo       string     `json:"ItemNo"`
-	Service      ServiceCut `json:"service"`
-	Payment      string     `json:"payment"`
-	Billed       string     `json:"billed"`
-	ProcessError FileError  `json:"error"`
+	Provider   string     `json:"provider"`
+	Patient    string     `json:"patient"`
+	InvoiceNo  string     `json:"invoiceNo"`
+	ItemNo     string     `json:"ItemNo"`
+	Service    ServiceCut `json:"service"`
+	Payment    string     `json:"payment"`
+	GST        string     `json:"gst"`
+	ServiceFee string     `json:"serviceFee"`
+	ErrorMsg   string     `json:"msg"`
 }
 
 var (
@@ -83,7 +87,7 @@ var (
 // Location,Provider,Billed To,Patient Name,Invoice No.,Service ID,Payment ID,Item No.,Description,Status,Transaction Date,Payment Method,Account Type,"GST
 // ClinicName,Dr Phoebe Kho,Irrelevant,Patient Name,162307,174545,71756,80010,"Clinical psychologist consultation, >50 min, consulting rooms",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50),0.00
 
-func processFileContent(content PaymentFile) ([]PaymentFileResponse, error) {
+func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 
 	//location := 0
 	provider := 1
@@ -91,21 +95,28 @@ func processFileContent(content PaymentFile) ([]PaymentFileResponse, error) {
 	invoiceNum := 4
 	itemNum := 7
 	//description := 8
-	//GST := 13
+	GST := 13
 	payment := 14
 	//deposit := 15
+
+	fileRes := FileProcessingResponse{}
+	fileRes.MissingProviders = map[string]string{}
+	fileRes.MissingItemNrs = map[string]string{}
+	fileRes.MissingServiceCodes = make(map[string]map[string]string)
 
 	res := []PaymentFileResponse{}
 	s, err := truncateCsv(content.FileContent, content.CsvLineStart)
 	if err != nil {
-		return res, err
+		return fileRes, err
 	}
 	reader := csv.NewReader(strings.NewReader(s))
 	records, err := reader.ReadAll()
 	if err != nil {
-		return processError(fmt.Sprintf("Reading csv file failed with error: %v", err), res), nil
+		fileRes.ChargeDetail = processError(fmt.Sprintf("Reading csv file failed with error: %v", err), res)
+		return fileRes, nil
 	}
 	itemMap := createItemMap(content.CodeMap)
+	providerMap := createProviderMap(content.PracMap)
 
 	lineNum := content.CsvLineStart
 	for _, record := range records {
@@ -123,20 +134,24 @@ func processFileContent(content PaymentFile) ([]PaymentFileResponse, error) {
 		//		continue
 		//	}
 		// providerServiceCodes := map[string]string{}
-		providerServiceCodes, ok := content.PracMap[prov]
+		providerServiceCodes, ok := providerMap[standardString(prov)]
 		if !ok {
-			res = processError(fmt.Sprintf("provider: %v in line: %v has not bee configured", record[provider], lineNum), res)
+			fileRes.MissingProviders[prov] = standardString(prov)
 			continue
 		}
 		serviceCode, ok := itemMap[strings.TrimSpace(record[itemNum])]
 		if !ok {
-			res = processError(fmt.Sprintf("item number: %v in line: %v not associated with a Service Code", record[itemNum], lineNum), res)
+			fileRes.MissingItemNrs[record[itemNum]] = record[itemNum]
 			continue
 		}
 		serviceCut, ok := providerServiceCodes[serviceCode]
 		if !ok {
-			res = processError(fmt.Sprintf("provider: %v in line: %v has no service cut assigned for service code: %v",
-				record[provider], lineNum, serviceCode), res)
+			errStr := fmt.Sprintf("provider: %v in line: %v has no service cut assigned for service code: %v",
+				record[provider], lineNum, serviceCode)
+			if fileRes.MissingServiceCodes[record[provider]] == nil {
+				fileRes.MissingServiceCodes[record[provider]] = make(map[string]string)
+			}
+			fileRes.MissingServiceCodes[record[provider]][serviceCode] = errStr
 			continue
 		}
 		billed, err := calcPayment(record[payment], serviceCut)
@@ -163,17 +178,19 @@ func processFileContent(content PaymentFile) ([]PaymentFileResponse, error) {
 				Code:       serviceCode,
 				Percentage: serviceCut,
 			},
-			Payment: record[payment],
-			Billed:  billed,
+			Payment:    record[payment],
+			GST:        record[GST],
+			ServiceFee: billed,
 		}
 		res = append(res, result)
 	}
-	return res, nil
+	fileRes.ChargeDetail = res
+	return fileRes, nil
 }
 
 func processError(err string, resp []PaymentFileResponse) []PaymentFileResponse {
 	res := PaymentFileResponse{}
-	res.ProcessError.ErrorMsg = err
+	res.ErrorMsg = err
 	logError.Printf(err)
 	return append(resp, res)
 
@@ -181,6 +198,10 @@ func processError(err string, resp []PaymentFileResponse) []PaymentFileResponse 
 func compareNames(name1, name2 string) bool {
 	return strings.Contains(strings.ToLower(strings.ReplaceAll(name1, " ", "")),
 		strings.ToLower(strings.ReplaceAll(name2, " ", "")))
+}
+func standardString(s string) string {
+	ns := strings.Join(strings.Fields(s), " ")
+	return strings.ToLower(ns)
 }
 
 func truncateCsv(content string, noneCsvLines int) (string, error) {
@@ -205,6 +226,13 @@ func createItemMap(itemMap map[string][]string) map[string]string {
 		for _, itemNr := range items {
 			result[itemNr] = serviceCode
 		}
+	}
+	return result
+}
+func createProviderMap(pracMap map[string]map[string]string) map[string]map[string]string {
+	result := make(map[string]map[string]string)
+	for provider, serviceCodes := range pracMap {
+		result[standardString(provider)] = serviceCodes
 	}
 	return result
 }
