@@ -46,7 +46,7 @@ running<br>
 command line: <br>
 ./dbHandler ./config <br>
 container run: <br>
-docker compose up <br>
+docker-compose up -d<br>
 docker run --entrypoint /bin/bash -it drjimdb <br>
 
 ## Calculations to be performed
