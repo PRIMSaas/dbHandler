@@ -42,11 +42,13 @@ type PaymentFile struct {
 	CompanyName  string                       `json:"companyName"`
 	CodeMap      map[string][]string          `json:"codeMap"`
 	PracMap      map[string]map[string]string `json:"pracMap"`
+	DescMap      map[string]string            `json:"descMap"` // maps description to service code
 }
 
 type FileProcessingResponse struct {
 	MissingProviders    map[string]string            `json:"missingProviders"`
 	MissingItemNrs      map[string]string            `json:"missingItemNrs"`
+	NoItemNrs           map[string]string            `json:"noItemNrs"`
 	MissingServiceCodes map[string]map[string]string `json:"missingServiceCodes"`
 	ChargeDetail        []PaymentFileResponse        `json:"chargeDetail"`
 }
@@ -94,7 +96,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	patient := 3
 	invoiceNum := 4
 	itemNum := 7
-	//description := 8
+	description := 8
 	GST := 13
 	payment := 14
 	//deposit := 15
@@ -102,6 +104,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	fileRes := FileProcessingResponse{}
 	fileRes.MissingProviders = map[string]string{}
 	fileRes.MissingItemNrs = map[string]string{}
+	fileRes.NoItemNrs = map[string]string{}
 	fileRes.MissingServiceCodes = make(map[string]map[string]string)
 
 	res := []PaymentFileResponse{}
@@ -139,11 +142,27 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 			fileRes.MissingProviders[prov] = standardString(prov)
 			continue
 		}
-		serviceCode, ok := itemMap[strings.TrimSpace(record[itemNum])]
-		if !ok {
-			fileRes.MissingItemNrs[record[itemNum]] = record[itemNum]
-			continue
+		//
+		// if there is no item number we use the description to map to the service code
+		//
+		serviceCode := ""
+		if strings.TrimSpace(record[itemNum]) == "" {
+			serviceCode, ok = itemMap[strings.TrimSpace(record[description])]
+			if !ok {
+				desc := strings.TrimSpace(record[description])
+				fileRes.NoItemNrs[desc] = desc
+				continue
+			}
+		} else {
+			serviceCode, ok = itemMap[strings.TrimSpace(record[itemNum])]
+			if !ok {
+				fileRes.MissingItemNrs[record[itemNum]] = record[itemNum]
+				continue
+			}
 		}
+		//
+		// Once we have a service code, get the percentage per provider for that service code
+		//
 		serviceCut, ok := providerServiceCodes[serviceCode]
 		if !ok {
 			errStr := fmt.Sprintf("provider: %v in line: %v has no service cut assigned for service code: %v",
@@ -154,6 +173,9 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 			fileRes.MissingServiceCodes[record[provider]][serviceCode] = errStr
 			continue
 		}
+		//
+		// Now we are ready to perform the calculations
+		//
 		billed, err := calcPayment(record[payment], serviceCut)
 		if err != nil {
 			if errors.Is(err, ErrAmount) {
@@ -169,6 +191,9 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 				record[provider], lineNum, record[payment], serviceCut, err.Error()), res)
 			continue
 		}
+		//
+		// Prepare the response to be sent back
+		//
 		result := PaymentFileResponse{
 			Provider:  record[provider],
 			Patient:   record[patient],
