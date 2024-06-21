@@ -27,8 +27,13 @@ Test APIS - beware in cloud run you leave out the port number: <br>
 
 curl -i -d '{"fileContent":"This is an awesome file ...", "serviceCodes":["one", "two"]}' -X POST http://localhost:8088/processFile <br>
 
-curl -i -d '{"userId":"srfsyfuqPXfhigSTTkJFwvBs9Jb2"}' -X POST https://drjimdb3-5f6uwrh2eq-km.a.run.app/getCompanies <br>
-curl -i -d '{"userId":"srfsyfuqPXfhigSTTkJFwvBs9Jb2"}' -X POST https://drjimdb-5f6uwrh2eq-ts.a.run.app/getCompanies<br>
+curl -i -d @curly.json -X POST https://drjimdb-5f6uwrh2eq-ts.a.run.app/processFile<br>
+
+### Testing CORS (OPTIONS)
+To let the front end call the API, CORS must be enabled, which sends a OPTIONS http request. To test manually use: <br>
+curl -i -H "Origin: http://127.0.0.1:5055" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type" -X OPTIONS http://localhost:8088/processFile
+ <br>
+curl -i -H "Origin: http://127.0.0.1:5055" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type" -X OPTIONS https://drjimdb-5f6uwrh2eq-ts.a.run.app/ processFile <br>
 
 <br>
 To view the firestore content **http://127.0.0.1:4000/firestore/**<br>

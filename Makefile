@@ -1,5 +1,5 @@
 
-all: fmt tidy build test vet 
+all: fmt tidy build test vet
 
 it: all
 
@@ -22,6 +22,16 @@ test:
 vet:
 	go vet
 
+docker:
+	docker build -t drjimdb .
+
+cloud: docker
+	docker tag drjimdb australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb
+	docker push australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb	
+
+run:
+	docker-compose up -d
+	
 lint:
 	golangci-lint run --disable typecheck --disable unused 
 

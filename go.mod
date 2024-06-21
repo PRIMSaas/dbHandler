@@ -5,7 +5,7 @@ go 1.21.1
 require (
 	cloud.google.com/go/firestore v1.14.0
 	firebase.google.com/go v3.13.0+incompatible
-	github.com/rs/cors v1.10.1
+	github.com/rs/cors v1.11.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/oauth2 v0.18.0
 	google.golang.org/api v0.168.0

@@ -34,7 +34,8 @@ type Value struct {
 // local config
 //
 type Properties struct {
-	Env string `yaml:"env"`
+	Env   string `yaml:"env"`
+	Debug bool   `yaml:"debug"`
 }
 
 var properties Properties
