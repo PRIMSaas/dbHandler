@@ -8,22 +8,27 @@ import (
 	"github.com/jung-kurt/gofpdf"
 )
 
-type TableText struct {
-	text  string
-	font  string  // "Courier" for fixed-width, "Helvetica" or "Arial" for sans serif, "Times" for serif, "Symbol" or "ZapfDingbats"
+type Font struct {
+	face  string
 	style string  // B, I, U, S
 	size  float64 // 8, 10, 12, 14, 16, 20
-	align string  // "L", "C" or "R" (left, center, right) in alignStr.
+}
+type TableText struct {
+	text  string
+	font  Font   // "Courier" for fixed-width, "Helvetica" or "Arial" for sans serif, "Times" for serif, "Symbol" or "ZapfDingbats"
+	align string // "L", "C" or "R" (left, center, right) in alignStr.
 	// Vertical alignment is controlled by including "T", "M", "B" or "A" (top, middle, bottom, baseline) in alignStr.
 	// The default alignment is left middle.
 	border string // "0" for no border, "1" for border around cell, "L", "T", "R", "B" for left, top, right, bottom.
 }
 
-var blankCell = TableText{"", "", "", 12, "", ""}
+var (
+	Arial12  = Font{"Arial", "", 12}
+	Arial12B = Font{"Arial", "B", 12}
+)
+var blankCell = TableText{}
 
 func TestInvoice(t *testing.T) {
-	configureLogging()
-
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 	pdf.SetMargins(10, 10, 30)
@@ -67,45 +72,54 @@ func TestInvoice(t *testing.T) {
 
 func addAddress(pdf *gofpdf.Fpdf, address Address) {
 	tableData := [][]TableText{
-		{TableText{"From:", "Arial", "B", 12, "L", ""}, TableText{address.CompanyName, "Arial", "", 12, "L", ""}},
-		{blankCell, TableText{address.StreetAddress, "Arial", "", 12, "L", ""}},
-		{blankCell, TableText{address.City, "Arial", "", 12, "L", ""}},
-		{TableText{"ABN", "Arial", "B", 12, "L", ""}, TableText{address.ABN, "Arial", "", 12, "L", ""}},
+		{TableText{text: "From:", font: Arial12B}, TableText{text: address.CompanyName}},
+		{blankCell, TableText{text: address.StreetAddress}},
+		{blankCell, TableText{text: address.City}},
+		{TableText{text: "ABN", font: Arial12B}, TableText{text: address.ABN}},
 	}
 	addTable(pdf, tableData, []float64{40, 150}, 5)
 }
 func addAddressDate(pdf *gofpdf.Fpdf, address Address, date string) {
 	tableData := [][]TableText{
-		{TableText{"From:", "Arial", "B", 12, "L", ""}, TableText{address.CompanyName, "Arial", "", 12, "L", ""}, TableText{date, "Arial", "", 14, "R", ""}},
-		{blankCell, TableText{address.StreetAddress, "Arial", "", 12, "L", ""}, blankCell},
-		{blankCell, TableText{address.City, "Arial", "", 12, "L", ""}, blankCell},
-		{TableText{"ABN", "Arial", "B", 12, "L", ""}, TableText{address.ABN, "Arial", "", 12, "L", ""}, blankCell},
+		{TableText{text: "From:", font: Arial12B}, TableText{text: address.CompanyName}, TableText{text: date, align: "R"}},
+		{blankCell, TableText{text: address.StreetAddress}, blankCell},
+		{blankCell, TableText{text: address.City}, blankCell},
+		{TableText{text: "ABN", font: Arial12B}, TableText{text: address.ABN}, blankCell},
 	}
 	addTable(pdf, tableData, []float64{40, 150, 0}, 5)
 }
 func addInvoiceDetails(pdf *gofpdf.Fpdf, prac string, email string, periodStart string, periodEnd string, invoiceNo string) {
 	tableData := [][]TableText{
-		{TableText{"Practitioner:", "Arial", "B", 12, "L", ""}, TableText{prac, "Arial", "", 12, "L", ""}, TableText{"Invoice Number", "Arial", "B", 12, "R", ""}},
-		{TableText{"Period:", "Arial", "B", 12, "L", ""}, TableText{periodStart + " - " + periodEnd, "Arial", "", 12, "L", ""}, TableText{invoiceNo, "Arial", "", 12, "R", ""}},
-		{TableText{"Email", "Arial", "B", 12, "L", ""}, TableText{email, "Arial", "", 12, "L", ""}, blankCell},
+		{TableText{text: "Practitioner:", font: Arial12B}, TableText{text: prac}, TableText{text: "Invoice Number", font: Arial12B, align: "R"}},
+		{TableText{text: "Period:", font: Arial12B}, TableText{text: periodStart + " - " + periodEnd}, TableText{text: invoiceNo, align: "R"}},
+		{TableText{text: "Email", font: Arial12B}, TableText{text: email}, blankCell},
 	}
 	addTable(pdf, tableData, []float64{40, 150, 0}, 5)
 
 }
 func addTotal(pdf *gofpdf.Fpdf, serviceFeeTotal int, gst int) {
 	tableData := [][]TableText{
-		{blankCell, TableText{"Service Fee (see calculation sheet)", "Arial", "", 12, "L", ""}, TableText{fmt.Sprintf("%d.%d", serviceFeeTotal/100, serviceFeeTotal%100), "Arial", "", 12, "R", ""}},
-		{blankCell, TableText{"GST on Service Fee", "Arial", "", 12, "L", "B"}, TableText{fmt.Sprintf("%d.%d", gst/100, gst%100), "Arial", "", 12, "R", "B"}},
-		{blankCell, TableText{"Total Service Fee", "Arial", "", 12, "L", "B"}, TableText{fmt.Sprintf("%d.%d", (serviceFeeTotal+gst)/100, (serviceFeeTotal+gst)%100), "Arial", "", 12, "R", "B"}},
+		{blankCell, TableText{text: "Service Fee (see calculation sheet)"}, TableText{text: pct(serviceFeeTotal), align: "R"}},
+		{blankCell, TableText{text: "GST on Service Fee", border: "B"}, TableText{text: pct(gst), align: "R", border: "B"}},
+		{blankCell, TableText{text: "Total Service Fee", border: "B"}, TableText{text: pct(serviceFeeTotal+gst), align: "R", border: "B"}},
 	}
 	addTable(pdf, tableData, []float64{40, 150, 0}, 5)
 }
-
+func pct(v int) string {
+	return fmt.Sprintf("%d.%d", v/100, v%100)
+}
 func addTable(pdf *gofpdf.Fpdf, data [][]TableText, colWidths []float64, height float64) {
 	for _, row := range data {
 		for i, value := range row {
-			if value.font != "" || value.style != "" || value.size != 0 {
-				pdf.SetFont(value.font, value.style, value.size)
+			//
+			// set default font if there is some text
+			//
+			var font = value.font
+			if font.face == "" || value.text != "" {
+				font = Arial12
+			}
+			if font.face != "" {
+				pdf.SetFont(value.font.face, value.font.style, value.font.size)
 			}
 			pdf.CellFormat(colWidths[i], height, value.text, value.border, 0, value.align, false, 0, "")
 		}
