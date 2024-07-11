@@ -14,11 +14,12 @@ type ServiceCut struct {
 	Percentage string `json:"percentage"`
 }
 type Address struct {
-	CompanyName string `json:"companyName"`
+	CompanyName   string `json:"companyName"`
 	StreetAddress string `json:"streetAddress"`
-	City string `json:"city"`
-	ABN string `json:"abn"`
+	City          string `json:"city"`
+	ABN           string `json:"abn"`
 }
+
 /*
 json payload
 

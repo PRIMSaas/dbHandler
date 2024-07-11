@@ -101,7 +101,7 @@ func addTotal(pdf *gofpdf.Fpdf, serviceFeeTotal int, gst int) {
 	tableData := [][]TableText{
 		{blankCell, TableText{text: "Service Fee (see calculation sheet)"}, TableText{text: pct(serviceFeeTotal), align: "R"}},
 		{blankCell, TableText{text: "GST on Service Fee", border: "B"}, TableText{text: pct(gst), align: "R", border: "B"}},
-		{blankCell, TableText{text: "Total Service Fee", border: "B"}, TableText{text: pct(serviceFeeTotal+gst), align: "R", border: "B"}},
+		{blankCell, TableText{text: "Total Service Fee", border: "B"}, TableText{text: pct(serviceFeeTotal + gst), align: "R", border: "B"}},
 	}
 	addTable(pdf, tableData, []float64{40, 150, 0}, 5)
 }
