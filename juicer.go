@@ -1,9 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
-	"log"
-	"testing"
+	"os"
+	"time"
 
 	"github.com/jung-kurt/gofpdf"
 )
@@ -28,11 +29,10 @@ var (
 )
 var blankCell = TableText{}
 
-func TestInvoice(t *testing.T) {
+func makePdf(provider string, details PaymentTotals) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 	pdf.SetMargins(10, 10, 30)
-	//drawGrid(pdf)
 
 	pdf.SetTitle("TAX INVOICE", false)
 	pdf.SetFont("Arial", "B", 16)
@@ -41,33 +41,84 @@ func TestInvoice(t *testing.T) {
 	pdf.SetXY(10, 29)
 	addAddress(pdf, Address{"Vermont Medical Clinic", "123 Main St", "Vermont SOUTH VIC 3133", "123456789"})
 	pdf.Ln(10)
-	addAddressDate(pdf, Address{"Dr Jim Glaspole", "37A Park Crescent", "Fairfield VIC 3078", "123456789"}, "05-05-24")
+	addAddressDate(pdf, Address{provider, "Unknown St", "Suburb State Postcode", "000000000"}, time.Now().Format("02-01-06"))
 	pdf.Ln(10)
-	addInvoiceDetails(pdf, "Dr Jim Glaspole", "jim@yeatpole.com", "29/04/2024", "05/05/2024", "JG20240505")
+	addInvoiceDetails(pdf, provider, "some_email@mail.com", "01/01/2024", "05/05/2024", "JG20240505")
 	pdf.Ln(10)
-	addTotal(pdf, 974327, 97433)
+	addTotal(pdf, details.ServiceCutTotal, details.GSTTotal)
 
 	pdf.AddPage()
 	pdf.SetMargins(10, 10, 30)
+	//drawGrid(pdf)
 	pdf.SetFont("Arial", "B", 16)
 	pdf.Text(10, 20, "Service Fee Calculations")
 	pdf.SetXY(10, 29)
-	//
-	// remember `` will honour newlines
-	//
-	//_, lineHt := pdf.GetFontSize()
-	/* 	pdf.MultiCell(0, lineHt*1.5, "This is a longer text that should be broken down into multiple lines.\n"+
-	"The text is long enough to wrap around the page and should be broken down into multiple lines. "+
-	"The text is long enough to wrap around the page and should be broken down into multiple lines. "+
-	"The text is long enough to wrap around the page and should be broken down into multiple lines. "+
-	"The text is long enough to wrap around the page and should be broken down into multiple lines. "+
-	"The text is long enough to wrap around the page and should be broken down into multiple lines.",
-	gofpdf.BorderFull, gofpdf.AlignRight, false)
-	*/
-	err := pdf.OutputFileAndClose("hello.pdf")
+	addServiceFeeCalculation(pdf, details)
+	addTotalCalc(pdf, details.ServiceCutTotal, details.GSTTotal)
+
+	var buf bytes.Buffer
+	err := pdf.Output(&buf)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
+
+	err = os.WriteFile("invoice.pdf", buf.Bytes(), 0644)
+	if err != nil {
+		logError.Printf("Error writing PDF: %v", err)
+	}
+
+	return buf.Bytes(), nil
+}
+
+/*
+Patient    string     `json:"patient"`
+InvoiceNo  string     `json:"invoiceNo"`
+ItemNo     string     `json:"ItemNo"`
+Service    ServiceCut `json:"service"`
+Payment    string     `json:"payment"`
+GST        string     `json:"gst"`
+ServiceFee string     `json:"serviceFee"`
+*/
+func addServiceFeeCalculation(pdf *gofpdf.Fpdf, details PaymentTotals) {
+	columns := []float64{25, 20, 15, 15, 25, 25, 25}
+	tableData := [][]TableText{
+		{
+			TableText{text: "InvoiceNo", font: Arial12B},
+			TableText{text: "ItemNo", font: Arial12B},
+			TableText{text: "Code", font: Arial12B},
+			TableText{text: "%", font: Arial12B},
+			TableText{text: "Payment", font: Arial12B},
+			TableText{text: "GST", font: Arial12B},
+			TableText{text: "Service Fee", font: Arial12B}},
+	}
+	addTable(pdf, tableData, columns, float64(len(columns)))
+	tableData = [][]TableText{}
+	for _, payments := range details.PaymentDetails {
+		tableData = append(tableData, []TableText{
+			{text: payments.InvoiceNo},
+			{text: payments.ItemNo},
+			{text: payments.Service.Code},
+			{text: payments.Service.Percentage},
+			{text: payments.Payment},
+			{text: payments.GST},
+			{text: payments.ServiceFee},
+		})
+	}
+	addTable(pdf, tableData, columns, float64(len(columns)))
+}
+func addTotalCalc(pdf *gofpdf.Fpdf, serviceFeeTotal int, gst int) {
+	columns := []float64{100, 25, 25}
+
+	tableData := [][]TableText{
+		{blankCell,
+			TableText{text: "", font: Font{"Arial", "", 8}, border: "T"},
+			TableText{text: "", font: Font{"Arial", "", 8}, border: "T"}},
+
+		{TableText{text: "Totals:", font: Arial12B},
+			TableText{text: fmt.Sprintf("%d", gst), font: Arial12B},
+			TableText{text: pct(serviceFeeTotal), font: Arial12B}},
+	}
+	addTable(pdf, tableData, columns, float64(len(columns)))
 }
 
 func addAddress(pdf *gofpdf.Fpdf, address Address) {
@@ -81,7 +132,7 @@ func addAddress(pdf *gofpdf.Fpdf, address Address) {
 }
 func addAddressDate(pdf *gofpdf.Fpdf, address Address, date string) {
 	tableData := [][]TableText{
-		{TableText{text: "From:", font: Arial12B}, TableText{text: address.CompanyName}, TableText{text: date, align: "R"}},
+		{TableText{text: "To:", font: Arial12B}, TableText{text: address.CompanyName}, TableText{text: date, align: "R"}},
 		{blankCell, TableText{text: address.StreetAddress}, blankCell},
 		{blankCell, TableText{text: address.City}, blankCell},
 		{TableText{text: "ABN", font: Arial12B}, TableText{text: address.ABN}, blankCell},
@@ -106,7 +157,10 @@ func addTotal(pdf *gofpdf.Fpdf, serviceFeeTotal int, gst int) {
 	addTable(pdf, tableData, []float64{40, 150, 0}, 5)
 }
 func pct(v int) string {
-	return fmt.Sprintf("%d.%d", v/100, v%100)
+	if v < 0 {
+		return fmt.Sprintf("(%d.%02d)", -v/100, -v%100)
+	}
+	return fmt.Sprintf("%d.%02d", v/100, v%100)
 }
 func addTable(pdf *gofpdf.Fpdf, data [][]TableText, colWidths []float64, height float64) {
 	for _, row := range data {
