@@ -4,8 +4,6 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
-	"math"
-	"strconv"
 	"strings"
 )
 
@@ -56,19 +54,38 @@ type FileProcessingResponse struct {
 	MissingItemNrs      map[string]string            `json:"missingItemNrs"`
 	NoItemNrs           map[string]string            `json:"noItemNrs"`
 	MissingServiceCodes map[string]map[string]string `json:"missingServiceCodes"`
-	ChargeDetail        []PaymentFileResponse        `json:"chargeDetail"`
+	ChargeDetail        map[string]PaymentTotals     `json:"chargeDetail"`
+	ErrorMsg            string                       `json:"errorMsg"`
 }
 
 type PaymentFileResponse struct {
-	Provider   string     `json:"provider"`
-	Patient    string     `json:"patient"`
-	InvoiceNo  string     `json:"invoiceNo"`
-	ItemNo     string     `json:"ItemNo"`
-	Service    ServiceCut `json:"service"`
-	Payment    string     `json:"payment"`
-	GST        string     `json:"gst"`
-	ServiceFee string     `json:"serviceFee"`
-	ErrorMsg   string     `json:"msg"`
+	Provider         string     `json:"provider"`
+	Patient          string     `json:"patient"`
+	InvoiceNo        string     `json:"invoiceNo"`
+	ItemNo           string     `json:"ItemNo"`
+	Service          ServiceCut `json:"service"`
+	Payment          string     `json:"payment"`
+	GST              string     `json:"gst"`
+	ServiceFee       string     `json:"serviceFee"`
+	ProviderErrorMsg string     `json:"msg"`
+}
+
+type PaymentTotals struct {
+	Provider        string                `json:"provider"`
+	PaymentDetails  []PaymentFileResponse `json:"paymentDetails"`
+	PaymentTotal    int                   `json:"paymentTotal"`
+	ServiceCutTotal int                   `json:"serviceCutTotal"`
+	GSTTotal        int                   `json:"gstTotal"`
+	PdfFile         []byte                `json:"invoice"`
+}
+
+func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFee int) {
+	p.PaymentDetails = append(p.PaymentDetails, details)
+	payment, _ := dollarStringToCents(details.Payment)
+	gst, _ := dollarStringToCents(details.GST)
+	p.PaymentTotal += payment
+	p.ServiceCutTotal += serviceFee
+	p.GSTTotal += gst
 }
 
 var (
@@ -113,7 +130,9 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	fileRes.NoItemNrs = map[string]string{}
 	fileRes.MissingServiceCodes = make(map[string]map[string]string)
 
-	res := []PaymentFileResponse{}
+	providerTotalsMap := map[string]PaymentTotals{}
+
+	result := PaymentFileResponse{}
 	s, err := truncateCsv(content.FileContent, content.CsvLineStart)
 	if err != nil {
 		return fileRes, err
@@ -121,7 +140,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	reader := csv.NewReader(strings.NewReader(s))
 	records, err := reader.ReadAll()
 	if err != nil {
-		fileRes.ChargeDetail = processError(fmt.Sprintf("Reading csv file failed with error: %v", err), res)
+		fileRes.ErrorMsg = fmt.Sprintf("Reading csv file failed with error: %v", err)
 		return fileRes, nil
 	}
 	itemMap := createItemMap(content.CodeMap)
@@ -185,45 +204,61 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 		billed, err := calcPayment(record[payment], serviceCut)
 		if err != nil {
 			if errors.Is(err, ErrAmount) {
-				res = processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
-					record[provider], lineNum, record[payment], err.Error()), res)
-				continue
+				result = processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
+					record[provider], lineNum, record[payment], err.Error()))
 			} else if errors.Is(err, ErrPercentage) {
-				res = processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
-					record[provider], lineNum, serviceCut, err.Error()), res)
-				continue
+				result = processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
+					record[provider], lineNum, serviceCut, err.Error()))
+			} else {
+				result = processError(fmt.Sprintf("provider: %v in line: %v with amount: %v and parcentage %v failed due to unknown error: %v",
+					record[provider], lineNum, record[payment], serviceCut, err.Error()))
 			}
-			res = processError(fmt.Sprintf("provider: %v in line: %v with amount: %v and parcentage %v failed due to unknown error: %v",
-				record[provider], lineNum, record[payment], serviceCut, err.Error()), res)
-			continue
+		} else {
+			//
+			// Prepare the response to be sent back
+			//
+			result = PaymentFileResponse{
+				Provider:  record[provider],
+				Patient:   record[patient],
+				InvoiceNo: record[invoiceNum],
+				ItemNo:    record[itemNum],
+				Service: ServiceCut{
+					Code:       serviceCode,
+					Percentage: serviceCut,
+				},
+				Payment:    record[payment],
+				GST:        record[GST],
+				ServiceFee: pct(billed),
+			}
 		}
-		//
-		// Prepare the response to be sent back
-		//
-		result := PaymentFileResponse{
-			Provider:  record[provider],
-			Patient:   record[patient],
-			InvoiceNo: record[invoiceNum],
-			ItemNo:    record[itemNum],
-			Service: ServiceCut{
-				Code:       serviceCode,
-				Percentage: serviceCut,
-			},
-			Payment:    record[payment],
-			GST:        record[GST],
-			ServiceFee: billed,
+		plist, exists := providerTotalsMap[record[provider]]
+		if !exists {
+			plist = PaymentTotals{Provider: record[provider]}
 		}
-		res = append(res, result)
+		plist.AddPaymentDetails(result, billed)
+		providerTotalsMap[record[provider]] = plist
 	}
-	fileRes.ChargeDetail = res
+	//
+	// Create PDFs
+	//
+	for provider, details := range providerTotalsMap {
+		file, err := makePdf(provider, details)
+		if err != nil {
+			logError.Printf("Error creating PDF for provider: %v. Cause: %v", provider, err)
+		}
+		details.PdfFile = file
+		details.Provider = provider
+		//break;
+	}
+	fileRes.ChargeDetail = providerTotalsMap
 	return fileRes, nil
 }
 
-func processError(err string, resp []PaymentFileResponse) []PaymentFileResponse {
+func processError(err string) PaymentFileResponse {
 	res := PaymentFileResponse{}
-	res.ErrorMsg = err
+	res.ProviderErrorMsg = err
 	logError.Printf(err)
-	return append(resp, res)
+	return res
 
 }
 func compareNames(name1, name2 string) bool {
@@ -266,44 +301,4 @@ func createProviderMap(pracMap map[string]map[string]string) map[string]map[stri
 		result[standardString(provider)] = serviceCodes
 	}
 	return result
-}
-
-func calcPayment(payment string, percentage string) (string, error) {
-	p, err := convertToFloat(payment)
-	if err != nil {
-		return "", fmt.Errorf("%w %w", ErrAmount, err)
-	}
-	perc, err := convertPercToFloat(percentage)
-	if err != nil {
-		return "", fmt.Errorf("%w %w", ErrPercentage, err)
-	}
-	partPay := p
-	if perc <= 0 {
-		return "", fmt.Errorf("%w %w", ErrPercentage, fmt.Errorf("percentage value must be greater than 0"))
-	}
-	partPay = math.Round(p*perc) / 100
-	return fmt.Sprintf("%.2f", partPay), nil
-}
-
-func convertToFloat(value string) (float64, error) {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return 0, fmt.Errorf("field is blank")
-	}
-	factor := 1
-	if value[0] == '(' {
-		factor = -1
-		value = strings.ReplaceAll(value, "(", "")
-		value = strings.ReplaceAll(value, ")", "")
-	}
-	num, err := strconv.ParseFloat(value, 64)
-	if err != nil {
-		return 0, fmt.Errorf("error converting value")
-	}
-	return num * float64(factor), nil
-}
-
-func convertPercToFloat(value string) (float64, error) {
-	value = strings.ReplaceAll(value, "%", "")
-	return convertToFloat(value)
 }
