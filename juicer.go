@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/jung-kurt/gofpdf"
@@ -62,11 +61,11 @@ func makePdf(provider string, details PaymentTotals) ([]byte, error) {
 		return nil, err
 	}
 
-	err = os.WriteFile("invoice.pdf", buf.Bytes(), 0644)
-	if err != nil {
-		logError.Printf("Error writing PDF: %v", err)
-	}
-
+	/* 	err = os.WriteFile("invoice.pdf", buf.Bytes(), 0644)
+	   	if err != nil {
+	   		logError.Printf("Error writing PDF: %v", err)
+	   	}
+	*/
 	return buf.Bytes(), nil
 }
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -76,7 +77,7 @@ type PaymentTotals struct {
 	PaymentTotal    int                   `json:"paymentTotal"`
 	ServiceCutTotal int                   `json:"serviceCutTotal"`
 	GSTTotal        int                   `json:"gstTotal"`
-	PdfFile         []byte                `json:"invoice"`
+	PdfFile         string                `json:"invoice"`
 }
 
 func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFee int) {
@@ -243,11 +244,14 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	//
 	for provider, details := range providerTotalsMap {
 		file, err := makePdf(provider, details)
+
 		if err != nil {
 			logError.Printf("Error creating PDF for provider: %v. Cause: %v", provider, err)
 		}
-		details.PdfFile = file
+		base64PDF := base64.StdEncoding.EncodeToString(file)
+		details.PdfFile = base64PDF
 		details.Provider = provider
+		providerTotalsMap[provider] = details
 		//break;
 	}
 	fileRes.ChargeDetail = providerTotalsMap
