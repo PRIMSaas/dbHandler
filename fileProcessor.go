@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -77,11 +76,10 @@ type PaymentTotals struct {
 	PaymentTotal    int                   `json:"paymentTotal"`
 	ServiceCutTotal int                   `json:"serviceCutTotal"`
 	GSTTotal        int                   `json:"gstTotal"`
-	PdfFile         string                `json:"invoice"`
+	PdfFile         []byte                `json:"invoice"`
 }
 
 func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFee int) {
-	p.PaymentDetails = append(p.PaymentDetails, details)
 	payment, _ := dollarStringToCents(details.Payment)
 	gst, _ := dollarStringToCents(details.GST)
 	p.PaymentTotal += payment
@@ -132,8 +130,8 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	fileRes.MissingServiceCodes = make(map[string]map[string]string)
 
 	providerTotalsMap := map[string]PaymentTotals{}
+	providerWithErrors := map[string]string{}
 
-	result := PaymentFileResponse{}
 	s, err := truncateCsv(content.FileContent, content.CsvLineStart)
 	if err != nil {
 		return fileRes, err
@@ -177,13 +175,13 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 			if !ok {
 				desc := strings.TrimSpace(record[description])
 				fileRes.NoItemNrs[desc] = desc
-				continue
+				providerWithErrors[prov] = prov
 			}
 		} else {
 			serviceCode, ok = itemMap[strings.TrimSpace(record[itemNum])]
 			if !ok {
 				fileRes.MissingItemNrs[record[itemNum]] = record[itemNum]
-				continue
+				providerWithErrors[prov] = prov
 			}
 		}
 		//
@@ -197,12 +195,23 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 				fileRes.MissingServiceCodes[record[provider]] = make(map[string]string)
 			}
 			fileRes.MissingServiceCodes[record[provider]][serviceCode] = errStr
+			providerWithErrors[prov] = prov
+		}
+		//
+		// If there was any errors detected for that provider we will not produce an invoice
+		//
+		if _, exists := providerWithErrors[prov]; exists {
 			continue
 		}
 		//
 		// Now we are ready to perform the calculations
 		//
 		billed, err := calcPayment(record[payment], serviceCut)
+		result := PaymentFileResponse{}
+		plist, exists := providerTotalsMap[record[provider]]
+		if !exists {
+			plist = PaymentTotals{Provider: record[provider]}
+		}
 		if err != nil {
 			if errors.Is(err, ErrAmount) {
 				result = processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
@@ -231,28 +240,25 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 				GST:        record[GST],
 				ServiceFee: pct(billed),
 			}
+			plist.AddPaymentDetails(result, billed)
 		}
-		plist, exists := providerTotalsMap[record[provider]]
-		if !exists {
-			plist = PaymentTotals{Provider: record[provider]}
-		}
-		plist.AddPaymentDetails(result, billed)
+		plist.PaymentDetails = append(plist.PaymentDetails, result)
 		providerTotalsMap[record[provider]] = plist
 	}
 	//
-	// Create PDFs
+	// Create PDFs, but only if that provider had no errors
 	//
 	for provider, details := range providerTotalsMap {
-		file, err := makePdf(provider, details)
+		if _, exists := providerWithErrors[provider]; !exists {
+			pdfBytes, err := makePdf(provider, details)
 
-		if err != nil {
-			logError.Printf("Error creating PDF for provider: %v. Cause: %v", provider, err)
+			if err != nil {
+				logError.Printf("Error creating PDF for provider: %v. Cause: %v", provider, err)
+			}
+			details.PdfFile = pdfBytes
+			details.Provider = provider
+			providerTotalsMap[provider] = details
 		}
-		base64PDF := base64.StdEncoding.EncodeToString(file)
-		details.PdfFile = base64PDF
-		details.Provider = provider
-		providerTotalsMap[provider] = details
-		//break;
 	}
 	fileRes.ChargeDetail = providerTotalsMap
 	return fileRes, nil
