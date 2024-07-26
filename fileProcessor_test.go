@@ -103,33 +103,28 @@ func TestCalcErrorBadNumbers(t *testing.T) {
 		CodeMap:      map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
 		PracMap:      map[string]map[string]string{drName: {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
 	}
-	var res FileProcessingResponse //[]PaymentFileResponse
 	//
 	// Missing service code for Dr
 	//
 	delete(paymentFile.PracMap[drName], goodCode)
 	paymentFile.PracMap[drName][goodCode] = "hello"
-	res, err := processFileContent(paymentFile)
-	require.NoError(t, err)
-	require.NotEmpty(t, res.ChargeDetail[drName].PaymentDetails[0].ProviderErrorMsg)
+	_, err := processFileContent(paymentFile)
+	require.Error(t, err)
 	// blank percentage
 	delete(paymentFile.PracMap[drName], goodCode)
 	paymentFile.PracMap[drName][goodCode] = ""
-	res, err = processFileContent(paymentFile)
-	require.NoError(t, err)
-	require.NotEmpty(t, res.ChargeDetail[drName].PaymentDetails[0].ProviderErrorMsg)
+	_, err = processFileContent(paymentFile)
+	require.Error(t, err)
 	// restore the good code
 	paymentFile.PracMap[drName][goodCode] = "30"
 	// bad payment
 	paymentFile.FileContent = "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50.50),0.00"
-	res, err = processFileContent(paymentFile)
-	require.NoError(t, err)
-	require.NotEmpty(t, res.ChargeDetail[drName].PaymentDetails[0].ProviderErrorMsg)
+	_, err = processFileContent(paymentFile)
+	require.Error(t, err)
 	// blank payment
 	paymentFile.FileContent = "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,,0.00"
-	res, err = processFileContent(paymentFile)
-	require.NoError(t, err)
-	require.NotEmpty(t, res.ChargeDetail[drName].PaymentDetails[0].ProviderErrorMsg)
+	_, err = processFileContent(paymentFile)
+	require.Error(t, err)
 }
 
 func TestConvertPayment(t *testing.T) {

@@ -55,19 +55,17 @@ type FileProcessingResponse struct {
 	NoItemNrs           map[string]string            `json:"noItemNrs"`
 	MissingServiceCodes map[string]map[string]string `json:"missingServiceCodes"`
 	ChargeDetail        map[string]PaymentTotals     `json:"chargeDetail"`
-	ErrorMsg            string                       `json:"errorMsg"`
 }
 
 type PaymentFileResponse struct {
-	Provider         string     `json:"provider"`
-	Patient          string     `json:"patient"`
-	InvoiceNo        string     `json:"invoiceNo"`
-	ItemNo           string     `json:"ItemNo"`
-	Service          ServiceCut `json:"service"`
-	Payment          string     `json:"payment"`
-	GST              string     `json:"gst"`
-	ServiceFee       string     `json:"serviceFee"`
-	ProviderErrorMsg string     `json:"msg"`
+	Provider   string     `json:"provider"`
+	Patient    string     `json:"patient"`
+	InvoiceNo  string     `json:"invoiceNo"`
+	ItemNo     string     `json:"ItemNo"`
+	Service    ServiceCut `json:"service"`
+	Payment    string     `json:"payment"`
+	GST        string     `json:"gst"`
+	ServiceFee string     `json:"serviceFee"`
 }
 
 type PaymentTotals struct {
@@ -79,12 +77,19 @@ type PaymentTotals struct {
 	PdfFile         []byte                `json:"invoice"`
 }
 
-func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFee int) {
-	payment, _ := dollarStringToCents(details.Payment)
-	gst, _ := dollarStringToCents(details.GST)
+func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFee int) error {
+	payment, err := dollarStringToCents(details.Payment)
+	if err != nil {
+		return err
+	}
+	gst, err := dollarStringToCents(details.GST)
+	if err != nil {
+		return err
+	}
 	p.PaymentTotal += payment
 	p.ServiceCutTotal += serviceFee
 	p.GSTTotal += gst
+	return nil
 }
 
 var (
@@ -139,8 +144,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	reader := csv.NewReader(strings.NewReader(s))
 	records, err := reader.ReadAll()
 	if err != nil {
-		fileRes.ErrorMsg = fmt.Sprintf("Reading csv file failed with error: %v", err)
-		return fileRes, nil
+		return fileRes, processError(fmt.Sprintf("Reading csv file failed with error: %v", err))
 	}
 	itemMap := createItemMap(content.CodeMap)
 	providerMap := createProviderMap(content.PracMap)
@@ -214,13 +218,13 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 		}
 		if err != nil {
 			if errors.Is(err, ErrAmount) {
-				result = processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
+				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
 					record[provider], lineNum, record[payment], err.Error()))
 			} else if errors.Is(err, ErrPercentage) {
-				result = processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
+				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
 					record[provider], lineNum, serviceCut, err.Error()))
 			} else {
-				result = processError(fmt.Sprintf("provider: %v in line: %v with amount: %v and parcentage %v failed due to unknown error: %v",
+				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v with amount: %v and parcentage %v failed due to unknown error: %v",
 					record[provider], lineNum, record[payment], serviceCut, err.Error()))
 			}
 		} else {
@@ -240,7 +244,11 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 				GST:        record[GST],
 				ServiceFee: pct(billed),
 			}
-			plist.AddPaymentDetails(result, billed)
+			err = plist.AddPaymentDetails(result, billed)
+			if err != nil {
+				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
+					record[provider], lineNum, record[payment], err.Error()))
+			}
 		}
 		plist.PaymentDetails = append(plist.PaymentDetails, result)
 		providerTotalsMap[record[provider]] = plist
@@ -264,11 +272,9 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	return fileRes, nil
 }
 
-func processError(err string) PaymentFileResponse {
-	res := PaymentFileResponse{}
-	res.ProviderErrorMsg = err
+func processError(err string) error {
 	logError.Printf(err)
-	return res
+	return fmt.Errorf("%s", err)
 
 }
 func compareNames(name1, name2 string) bool {
@@ -285,7 +291,9 @@ func truncateCsv(content string, noneCsvLines int) (string, error) {
 	for i := 0; i < noneCsvLines-1; i++ {
 		nextNewline := strings.Index(content[index:], "\n")
 		if nextNewline == -1 {
-			return "", fmt.Errorf("file content has less than %v lines", noneCsvLines)
+			ers := fmt.Sprintf("file content has less than %v lines", noneCsvLines)
+			logError.Printf(ers)
+			return "", fmt.Errorf("%s", ers)
 		}
 		index += nextNewline + 1
 	}
