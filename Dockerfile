@@ -11,6 +11,9 @@ RUN go build -v -o /usr/local/bin/app ./...
 
 FROM debian:12.5-slim
 COPY --from=builder /usr/local/bin/app /usr/local/bin
+COPY logo.png /usr/local/bin
+WORKDIR /usr/local/bin
+
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates
 RUN update-ca-certificates

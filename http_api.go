@@ -23,13 +23,13 @@ func processFile(writer http.ResponseWriter, request *http.Request) {
 	err = json.Unmarshal(body, &file)
 	if err != nil {
 		errs := fmt.Sprintf("Error parsing json body: %v", err)
-		http.Error(writer, errs, http.StatusInternalServerError)
+		http.Error(writer, errs, http.StatusBadRequest)
 		return
 	}
 	resp, err := processFileContent(file)
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
-		http.Error(writer, fmt.Sprint(err), http.StatusInternalServerError)
+		http.Error(writer, fmt.Sprint(err), http.StatusUnprocessableEntity)
 		return
 	}
 

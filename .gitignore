@@ -9,6 +9,8 @@
 *.dylib
 *.log
 *.sh
+*.pdf
+__debug_*
 
 drjim-f2087-fc31272ae857.json
 vendor/
