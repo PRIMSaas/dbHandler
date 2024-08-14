@@ -36,7 +36,7 @@ func makePdf(provider string, details PaymentTotals) ([]byte, error) {
 	pdf.SetTitle("TAX INVOICE", false)
 	pdf.SetFont("Arial", "B", 16)
 	pdf.Text(10, 20, "TAX INVOICE")
-	pdf.ImageOptions("logo.png", 150, 20, 35, 35, false, gofpdf.ImageOptions{ImageType: "PNG", ReadDpi: true}, 0, "")
+	pdf.ImageOptions("logo.jpg", 150, 20, 35, 35, false, gofpdf.ImageOptions{ImageType: "JPEG", ReadDpi: true}, 0, "")
 	pdf.SetXY(10, 29)
 	addAddress(pdf, Address{"Vermont Medical Clinic", "123 Main St", "Vermont SOUTH VIC 3133", "123456789"})
 	pdf.Ln(10)
