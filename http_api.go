@@ -3,11 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rs/cors"
 	"io"
 	"net/http"
-	"time"
 	"net/http/pprof"
-	"github.com/rs/cors"
+	"time"
 )
 
 func processFile(writer http.ResponseWriter, request *http.Request) {
