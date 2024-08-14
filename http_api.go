@@ -6,7 +6,7 @@ import (
 	"io"
 	"net/http"
 	"time"
-
+	"net/http/pprof"
 	"github.com/rs/cors"
 )
 
@@ -29,13 +29,14 @@ func processFile(writer http.ResponseWriter, request *http.Request) {
 	resp, err := processFileContent(file)
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
-		http.Error(writer, fmt.Sprint(err), http.StatusUnprocessableEntity)
+		errStr := fmt.Sprintf("Error processing file: %v", err)
+		http.Error(writer, errStr, http.StatusUnprocessableEntity)
 		return
 	}
-
 	err = json.NewEncoder(writer).Encode(resp)
 	if err != nil {
-		http.Error(writer, "Error encoding response body", http.StatusInternalServerError)
+		errStr := fmt.Sprintf("Error encoding response body: %v", err)
+		http.Error(writer, errStr, http.StatusInternalServerError)
 		return
 	}
 	// On success, set the Content-Type header to application/json
@@ -62,6 +63,7 @@ func runHttpApi(port int, maxClients int) {
 	logInfo.Printf("Starting HTTP server: %s with max clients: %d", httpAddress, maxClients)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/processFile", processFile)
+	mux.HandleFunc("/profile", pprof.Profile)
 	handler := c.Handler(mux)
 
 	err := http.ListenAndServe(httpAddress, handler)
