@@ -46,7 +46,7 @@ type PaymentFile struct {
 	CompanyName  string                       `json:"companyName"`
 	CodeMap      map[string][]string          `json:"codeMap"`
 	PracMap      map[string]map[string]string `json:"pracMap"`
-	DescMap      map[string]string            `json:"descMap"` // maps description to service code
+	AdjustMap    map[string][]Adjustments     `json:"adjustMap"` // maps providers to adjustments
 }
 
 type FileProcessingResponse struct {
@@ -68,12 +68,18 @@ type PaymentFileResponse struct {
 	ServiceFee string     `json:"serviceFee"`
 }
 
+type Adjustments struct {
+	Description string `json:"description"`
+	Amount      int    `json:"amount"`
+}
+
 type PaymentTotals struct {
 	Provider        string                `json:"provider"`
 	PaymentDetails  []PaymentFileResponse `json:"paymentDetails"`
 	PaymentTotal    int                   `json:"paymentTotal"`
 	ServiceCutTotal int                   `json:"serviceCutTotal"`
 	GSTTotal        int                   `json:"gstTotal"`
+	AdjustmentTotal int                   `json:"adjustmentTotal"`
 	PdfFile         []byte                `json:"invoice"`
 }
 
@@ -258,7 +264,14 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	//
 	for provider, details := range providerTotalsMap {
 		if _, exists := providerWithErrors[provider]; !exists {
-			pdfBytes, err := makePdf(provider, details)
+			if content.AdjustMap[provider] != nil {
+				details.AdjustmentTotal = 0
+				for _, adj := range content.AdjustMap[provider] {
+					details.AdjustmentTotal += adj.Amount
+				}
+			}
+			details.PaymentTotal = details.PaymentTotal + details.AdjustmentTotal
+			pdfBytes, err := makePdf(provider, details, content.AdjustMap[provider])
 
 			if err != nil {
 				logError.Printf("Error creating PDF for provider: %v. Cause: %v", provider, err)

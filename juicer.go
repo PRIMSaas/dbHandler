@@ -28,7 +28,7 @@ var (
 )
 var blankCell = TableText{}
 
-func makePdf(provider string, details PaymentTotals) ([]byte, error) {
+func makePdf(provider string, details PaymentTotals, adjustments []Adjustments) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 	pdf.SetMargins(10, 10, 30)
@@ -44,7 +44,7 @@ func makePdf(provider string, details PaymentTotals) ([]byte, error) {
 	pdf.Ln(10)
 	addInvoiceDetails(pdf, provider, "some_email@mail.com", "01/01/2024", "05/05/2024", "JG20240505")
 	pdf.Ln(10)
-	addTotal(pdf, details.ServiceCutTotal, details.GSTTotal)
+	addTotal(pdf, details.ServiceCutTotal, details.GSTTotal, details.AdjustmentTotal)
 
 	pdf.AddPage()
 	pdf.SetMargins(10, 10, 30)
@@ -53,6 +53,8 @@ func makePdf(provider string, details PaymentTotals) ([]byte, error) {
 	pdf.Text(10, 20, "Service Fee Calculations")
 	pdf.SetXY(10, 29)
 	addServiceFeeCalculation(pdf, details)
+	pdf.Ln(5)
+	addAdjustments(pdf, adjustments)
 	addTotalCalc(pdf, details.ServiceCutTotal, details.GSTTotal)
 
 	var buf bytes.Buffer
@@ -90,7 +92,7 @@ func addServiceFeeCalculation(pdf *gofpdf.Fpdf, details PaymentTotals) {
 			TableText{text: "GST", font: Arial12B},
 			TableText{text: "Service Fee", font: Arial12B}},
 	}
-	addTable(pdf, tableData, columns, float64(len(columns)))
+	addTable(pdf, tableData, columns, 7)
 	tableData = [][]TableText{}
 	for _, payments := range details.PaymentDetails {
 		tableData = append(tableData, []TableText{
@@ -103,8 +105,35 @@ func addServiceFeeCalculation(pdf *gofpdf.Fpdf, details PaymentTotals) {
 			{text: payments.ServiceFee},
 		})
 	}
-	addTable(pdf, tableData, columns, float64(len(columns)))
+	addTable(pdf, tableData, columns, 5)
 }
+
+func addAdjustments(pdf *gofpdf.Fpdf, adjustments []Adjustments) {
+	if len(adjustments) == 0 {
+		return
+	}
+	columns := []float64{75, 25, 25, 25}
+	tableData := [][]TableText{
+		{
+			TableText{text: "Adjustments", font: Arial12B},
+			TableText{text: "Charge", font: Arial12B},
+			TableText{text: "GST", font: Arial12B},
+			TableText{text: "Fee", font: Arial12B}},
+	}
+	addTable(pdf, tableData, columns, 7)
+	tableData = [][]TableText{}
+	for _, payments := range adjustments {
+		amount := pct(payments.Amount)
+		tableData = append(tableData, []TableText{
+			{text: payments.Description},
+			{text: amount},
+			{text: "0"},
+			{text: amount},
+		})
+	}
+	addTable(pdf, tableData, columns, 5)
+}
+
 func addTotalCalc(pdf *gofpdf.Fpdf, serviceFeeTotal int, gst int) {
 	columns := []float64{100, 25, 25}
 
@@ -117,7 +146,7 @@ func addTotalCalc(pdf *gofpdf.Fpdf, serviceFeeTotal int, gst int) {
 			TableText{text: fmt.Sprintf("%d", gst), font: Arial12B},
 			TableText{text: pct(serviceFeeTotal), font: Arial12B}},
 	}
-	addTable(pdf, tableData, columns, float64(len(columns)))
+	addTable(pdf, tableData, columns, 3)
 }
 
 func addAddress(pdf *gofpdf.Fpdf, address Address) {
@@ -147,12 +176,17 @@ func addInvoiceDetails(pdf *gofpdf.Fpdf, prac string, email string, periodStart 
 	addTable(pdf, tableData, []float64{40, 150, 0}, 5)
 
 }
-func addTotal(pdf *gofpdf.Fpdf, serviceFeeTotal int, gst int) {
+func addTotal(pdf *gofpdf.Fpdf, serviceFeeTotal int, gst int, adjustments int) {
 	tableData := [][]TableText{
 		{blankCell, TableText{text: "Service Fee (see calculation sheet)"}, TableText{text: pct(serviceFeeTotal), align: "R"}},
-		{blankCell, TableText{text: "GST on Service Fee", border: "B"}, TableText{text: pct(gst), align: "R", border: "B"}},
-		{blankCell, TableText{text: "Total Service Fee", border: "B"}, TableText{text: pct(serviceFeeTotal + gst), align: "R", border: "B"}},
+		{blankCell, TableText{text: "GST on Service Fee"}, TableText{text: pct(gst), align: "R"}}}
+	if adjustments != 0 {
+		tableData = append(tableData, []TableText{blankCell, TableText{text: "Adjustments", border: "B"},
+			TableText{text: pct(adjustments), align: "R"},
+		})
 	}
+	tableData = append(tableData, []TableText{blankCell, TableText{text: "Total", border: "B"},
+		TableText{text: pct(serviceFeeTotal + gst), align: "R", border: "B"}})
 	addTable(pdf, tableData, []float64{40, 150, 0}, 5)
 }
 func pct(v int) string {
