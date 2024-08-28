@@ -8,6 +8,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var addr = Address{Name: "A Practice",
+	StreetAddress: "22 Happy St",
+	City:          "Melbourne, 3000, VIC",
+	ABN:           "12345678901",
+	Email:         "a@b.c"}
+
 func ReadTestFile(fileName string) (string, error) {
 	b, err := os.ReadFile("PaymentsExport.csv")
 	if err != nil {
@@ -22,11 +28,11 @@ func TestCalculate1(t *testing.T) {
 	drName := "Dr Aha"
 
 	paymentFile := PaymentFile{
-		FileContent:  dr1, //+ "\n" + dr2,
-		CsvLineStart: 0,
-		CompanyName:  "A Practice",
-		CodeMap:      map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
-		PracMap:      map[string]map[string]string{drName: {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
+		FileContent:    dr1, //+ "\n" + dr2,
+		CsvLineStart:   0,
+		CompanyDetails: addr,
+		CodeMap:        map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
+		PracMap:        map[string]map[string]string{drName: {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
 	}
 	var res FileProcessingResponse
 	res, err := processFileContent(paymentFile)
@@ -47,11 +53,11 @@ func TestCalcErrorItemMappingServiceCode(t *testing.T) {
 
 	drName := "Dr Aha"
 	paymentFile := PaymentFile{
-		FileContent:  dr1, // + "\n" + dr2,
-		CsvLineStart: 0,
-		CompanyName:  "A Practice",
-		CodeMap:      map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
-		PracMap:      map[string]map[string]string{drName: {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
+		FileContent:    dr1, // + "\n" + dr2,
+		CsvLineStart:   0,
+		CompanyDetails: addr,
+		CodeMap:        map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
+		PracMap:        map[string]map[string]string{drName: {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
 	}
 	var res FileProcessingResponse
 	//
@@ -97,11 +103,11 @@ func TestCalcErrorBadNumbers(t *testing.T) {
 	//dr2 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,91182,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
 
 	paymentFile := PaymentFile{
-		FileContent:  dr1, // + "\n" + dr2,
-		CsvLineStart: 0,
-		CompanyName:  "A Practice",
-		CodeMap:      map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
-		PracMap:      map[string]map[string]string{drName: {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
+		FileContent:    dr1, // + "\n" + dr2,
+		CsvLineStart:   0,
+		CompanyDetails: addr,
+		CodeMap:        map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
+		PracMap:        map[string]map[string]string{drName: {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
 	}
 	//
 	// Missing service code for Dr
