@@ -12,10 +12,11 @@ type ServiceCut struct {
 	Percentage string `json:"percentage"`
 }
 type Address struct {
-	CompanyName   string `json:"companyName"`
+	Name          string `json:"name"`
 	StreetAddress string `json:"streetAddress"`
 	City          string `json:"city"`
 	ABN           string `json:"abn"`
+	Email         string `json:"email"`
 }
 
 /*
@@ -24,7 +25,7 @@ json payload
 	{
 	    "FileContent": "your_file_content",
 	    "CsvLineStart": 16,
-	    "CompanyName": "Vermont Medical Clinic",
+	    "CompanyDetails": Address{...},
 	    "CodeMap": [
 	        {
 	            "code1": ["123", "456"]
@@ -41,12 +42,13 @@ json payload
 	}
 */
 type PaymentFile struct {
-	FileContent  string                       `json:"fileContent"`
-	CsvLineStart int                          `json:"csvLineStart"`
-	CompanyName  string                       `json:"companyName"`
-	CodeMap      map[string][]string          `json:"codeMap"`
-	PracMap      map[string]map[string]string `json:"pracMap"`
-	AdjustMap    map[string][]Adjustments     `json:"adjustMap"` // maps providers to adjustments
+	FileContent    string                       `json:"fileContent"`
+	CsvLineStart   int                          `json:"csvLineStart"`
+	CompanyDetails Address                      `json:"companyDetails"`
+	CodeMap        map[string][]string          `json:"codeMap"`
+	PracMap        map[string]map[string]string `json:"pracMap"`
+	PracDetails    map[string]Address           `json:"pracDetails"`
+	AdjustMap      map[string][]Adjustments     `json:"adjustMap"` // maps providers to adjustments
 }
 
 type FileProcessingResponse struct {
@@ -271,7 +273,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 				}
 			}
 			details.PaymentTotal = details.PaymentTotal + details.AdjustmentTotal
-			pdfBytes, err := makePdf(provider, details, content.AdjustMap[provider])
+			pdfBytes, err := makePdf(provider, details, content.AdjustMap[provider], content.CompanyDetails, content.PracDetails[provider])
 
 			if err != nil {
 				logError.Printf("Error creating PDF for provider: %v. Cause: %v", provider, err)

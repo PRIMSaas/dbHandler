@@ -28,7 +28,7 @@ var (
 )
 var blankCell = TableText{}
 
-func makePdf(provider string, details PaymentTotals, adjustments []Adjustments) ([]byte, error) {
+func makePdf(provider string, details PaymentTotals, adjustments []Adjustments, companyDetails Address, providerAddr Address) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 	pdf.SetMargins(10, 10, 30)
@@ -38,11 +38,11 @@ func makePdf(provider string, details PaymentTotals, adjustments []Adjustments) 
 	pdf.Text(10, 20, "TAX INVOICE")
 	pdf.ImageOptions("logo.jpg", 150, 20, 35, 35, false, gofpdf.ImageOptions{ImageType: "JPEG", ReadDpi: true}, 0, "")
 	pdf.SetXY(10, 29)
-	addAddress(pdf, Address{"Vermont Medical Clinic", "123 Main St", "Vermont SOUTH VIC 3133", "123456789"})
+	addAddress(pdf, companyDetails)
 	pdf.Ln(10)
-	addAddressDate(pdf, Address{provider, "Unknown St", "Suburb State Postcode", "000000000"}, time.Now().Format("02-01-06"))
+	addAddressDate(pdf, providerAddr, time.Now().Format("02-01-06"))
 	pdf.Ln(10)
-	addInvoiceDetails(pdf, provider, "some_email@mail.com", "01/01/2024", "05/05/2024", "JG20240505")
+	addInvoiceDetails(pdf, provider, providerAddr.Email, "01/01/2024", "05/05/2024", "JG20240505")
 	pdf.Ln(10)
 	addTotal(pdf, details.ServiceCutTotal, details.GSTTotal, details.AdjustmentTotal)
 
@@ -151,7 +151,7 @@ func addTotalCalc(pdf *gofpdf.Fpdf, serviceFeeTotal int, gst int) {
 
 func addAddress(pdf *gofpdf.Fpdf, address Address) {
 	tableData := [][]TableText{
-		{TableText{text: "From:", font: Arial12B}, TableText{text: address.CompanyName}},
+		{TableText{text: "From:", font: Arial12B}, TableText{text: address.Name}},
 		{blankCell, TableText{text: address.StreetAddress}},
 		{blankCell, TableText{text: address.City}},
 		{TableText{text: "ABN", font: Arial12B}, TableText{text: address.ABN}},
@@ -160,7 +160,7 @@ func addAddress(pdf *gofpdf.Fpdf, address Address) {
 }
 func addAddressDate(pdf *gofpdf.Fpdf, address Address, date string) {
 	tableData := [][]TableText{
-		{TableText{text: "To:", font: Arial12B}, TableText{text: address.CompanyName}, TableText{text: date, align: "R"}},
+		{TableText{text: "To:", font: Arial12B}, TableText{text: address.Name}, TableText{text: date, align: "R"}},
 		{blankCell, TableText{text: address.StreetAddress}, blankCell},
 		{blankCell, TableText{text: address.City}, blankCell},
 		{TableText{text: "ABN", font: Arial12B}, TableText{text: address.ABN}, blankCell},
