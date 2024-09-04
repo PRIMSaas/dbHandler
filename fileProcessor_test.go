@@ -136,21 +136,21 @@ func TestCalcErrorBadNumbers(t *testing.T) {
 func TestConvertPayment(t *testing.T) {
 	tests := []struct {
 		input  string
-		output float64
+		output string
 	}{
-		{"123.45", 123.45},
-		{"123", 123},
-		{"123.4", 123.4},
-		{"123.456", 123.456},
-		{"(123.45)", -123.45},
-		{"(123", -123},
-		{"(123.4)", -123.4},
-		{"(123.456)", -123.456},
+		{"123.45", "123.45"},
+		{"123", "123.00"},
+		{"123.4", "123.40"},
+		{"123.456", "123.45"},
+		{"(123.45)", "(123.45)"},
+		{"(123", "(123.00)"},
+		{"(123.4)", "(123.40)"},
+		{"(123.456)", "(123.45)"},
 	}
 	for _, test := range tests {
 		res, err := convertToFloat(test.input)
 		require.NoError(t, err)
-		require.Equal(t, test.output, res)
+		require.Equal(t, test.output, pct(res))
 	}
 	_, err := convertToFloat("test.input")
 	require.Error(t, err)
@@ -163,11 +163,11 @@ func TestConvertPayment(t *testing.T) {
 func TestConvertPecentage(t *testing.T) {
 	tests := []struct {
 		input  string
-		output float64
+		output int
 	}{
-		{"10%", 10},
-		{"80", 80},
-		{"5.0%", 5},
+		{"10%", 1000},
+		{"80", 8000},
+		{"5.0%", 500},
 	}
 	for _, test := range tests {
 		res, err := convertPercToFloat(test.input)
@@ -184,20 +184,22 @@ func TestConvertPecentage(t *testing.T) {
 func TestCalcPayment(t *testing.T) {
 	tests := []struct {
 		payment    string
+		gst        string
 		percentage string
 		output     int
 	}{
-		{"123.45", "10%", 1235},
-		{"123", "80", 9840},
-		{"123.4", "", 0},
-		{"123.456", "5.0%", 617},
-		{"(123.45)", "10%", -1235},
-		{"(123", "80", -9840},
-		{"(123.4)", "", 0},
-		{"(123.456)", "5.0%", -617},
+		{"123.45", "0", "10%", 1235},
+		{"123", "0", "80", 9840},
+		{"123.4", "0", "", 0},
+		{"123.456", "0", "5.0%", 617},
+		{"(123.45)", "0", "10%", -1235},
+		{"(123", "0", "80", -9840},
+		{"(123.4)", "0", "", 0},
+		{"(123.456)", "0", "5.0%", -617},
+		{"(80.1)", "0", "5.5%", -441},
 	}
 	for _, test := range tests {
-		res, err := calcPayment(test.payment, test.percentage)
+		res, _, err := calcPayment(test.payment, test.gst, test.percentage)
 		if test.output == 0 {
 			require.Error(t, err)
 		} else {
@@ -257,7 +259,7 @@ func TestCalculator(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, tc.cents, cents)
 
-		res, err := calcPayment(tc.dval, tc.perc)
+		res, _, err := calcPayment(tc.dval, "0", tc.perc)
 		require.NoError(t, err)
 		require.Equal(t, tc.pcents, res)
 	}
