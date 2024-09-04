@@ -60,14 +60,15 @@ type FileProcessingResponse struct {
 }
 
 type PaymentFileResponse struct {
-	Provider   string     `json:"provider"`
-	Patient    string     `json:"patient"`
-	InvoiceNo  string     `json:"invoiceNo"`
-	ItemNo     string     `json:"ItemNo"`
-	Service    ServiceCut `json:"service"`
-	Payment    string     `json:"payment"`
-	GST        string     `json:"gst"`
-	ServiceFee string     `json:"serviceFee"`
+	Provider     string     `json:"provider"`
+	Patient      string     `json:"patient"`
+	InvoiceNo    string     `json:"invoiceNo"`
+	ItemNo       string     `json:"ItemNo"`
+	Service      ServiceCut `json:"service"`
+	Payment      string     `json:"payment"`
+	GST          string     `json:"gst"`
+	TotalPayment string     `json:"totalPayment"`
+	ServiceFee   string     `json:"serviceFee"`
 }
 
 type Adjustments struct {
@@ -76,13 +77,14 @@ type Adjustments struct {
 }
 
 type PaymentTotals struct {
-	Provider        string                `json:"provider"`
-	PaymentDetails  []PaymentFileResponse `json:"paymentDetails"`
-	PaymentTotal    int                   `json:"paymentTotal"`
-	ServiceCutTotal int                   `json:"serviceCutTotal"`
-	GSTTotal        int                   `json:"gstTotal"`
-	AdjustmentTotal int                   `json:"adjustmentTotal"`
-	PdfFile         []byte                `json:"invoice"`
+	Provider            string                `json:"provider"`
+	PaymentDetails      []PaymentFileResponse `json:"paymentDetails"`
+	PaymentTotalWithGST int                   `json:"paymentTotal"`
+	PaymentTotalNoGST   int                   `json:"PaymentTotalWithGST"`
+	ServiceCutTotal     int                   `json:"serviceCutTotal"`
+	GSTTotal            int                   `json:"gstTotal"`
+	AdjustmentTotal     int                   `json:"adjustmentTotal"`
+	PdfFile             []byte                `json:"invoice"`
 }
 
 func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFee int) error {
@@ -94,7 +96,12 @@ func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFe
 	if err != nil {
 		return err
 	}
-	p.PaymentTotal += payment
+
+	if gst > 0 {
+		p.PaymentTotalWithGST += payment
+	} else {
+		p.PaymentTotalNoGST += payment
+	}
 	p.ServiceCutTotal += serviceFee
 	p.GSTTotal += gst
 	return nil
@@ -182,7 +189,9 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 		// if there is no item number we use the description to map to the service code
 		//
 		serviceCode := ""
+		itemDesc := strings.TrimSpace(record[itemNum])
 		if strings.TrimSpace(record[itemNum]) == "" {
+			itemDesc = strings.TrimSpace(record[description])
 			serviceCode, ok = itemMap[strings.TrimSpace(record[description])]
 			if !ok {
 				desc := strings.TrimSpace(record[description])
@@ -218,7 +227,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 		//
 		// Now we are ready to perform the calculations
 		//
-		billed, err := calcPayment(record[payment], serviceCut)
+		billed, totalP, err := calcPayment(record[payment], record[GST], serviceCut)
 		result := PaymentFileResponse{}
 		plist, exists := providerTotalsMap[record[provider]]
 		if !exists {
@@ -243,14 +252,15 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 				Provider:  record[provider],
 				Patient:   record[patient],
 				InvoiceNo: record[invoiceNum],
-				ItemNo:    record[itemNum],
+				ItemNo:    itemDesc,
 				Service: ServiceCut{
 					Code:       serviceCode,
 					Percentage: serviceCut,
 				},
-				Payment:    record[payment],
-				GST:        record[GST],
-				ServiceFee: pct(billed),
+				Payment:      record[payment],
+				GST:          record[GST],
+				TotalPayment: pct(totalP),
+				ServiceFee:   pct(billed),
 			}
 			err = plist.AddPaymentDetails(result, billed)
 			if err != nil {
@@ -272,7 +282,6 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 					details.AdjustmentTotal += adj.Amount
 				}
 			}
-			details.PaymentTotal = details.PaymentTotal + details.AdjustmentTotal
 			pdfBytes, err := makePdf(provider, details, content.AdjustMap[provider], content.CompanyDetails, content.PracDetails[provider])
 
 			if err != nil {
