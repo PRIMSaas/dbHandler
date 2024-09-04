@@ -35,6 +35,12 @@ func calcPayment(payment string, gst string, percentage string) (int, int, error
 	return int(math.Round(partPay)), p + g, nil
 }
 
+func calcGST(num1 int, num2 int) int {
+	total := float64(num1 + num2)
+	tenPercent := total / 10
+	return int(math.Round(tenPercent))
+}
+
 func convertToFloat(value string) (int, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -80,7 +86,7 @@ func dollarStringToCents(dollarStr string) (int, error) {
 	// Remove any leading "$" sign if present
 	dollarStr = strings.TrimPrefix(dollarStr, "$")
 
-	// Parse the string to a float64
+	// Parse the string to a int
 	value, err := convertToFloat(dollarStr)
 	if err != nil {
 		return 0, fmt.Errorf("invalid dollar amount: %v", err)

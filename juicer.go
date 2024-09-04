@@ -117,12 +117,12 @@ func addTotalCalc(pdf *gofpdf.Fpdf, details PaymentTotals) {
 
 	tableData := [][]TableText{
 		{TableText{text: "Totals:", font: Arial12B},
-			TableText{text: pct(details.PaymentTotalNoGST), align: "R",font: Arial12B, border: "T"},
+			TableText{text: pct(details.PaymentTotalNoGST), align: "R", font: Arial12B, border: "T"},
 			TableText{text: pct(details.PaymentTotalWithGST), align: "R", font: Arial12B, border: "T"},
 			blankCell,
 			blankCell,
 			blankCell,
-			TableText{text: pct(details.ServiceCutTotal), align: "R",font: Arial12B, border: "T"}},
+			TableText{text: pct(details.ServiceCutTotal), align: "R", font: Arial12B, border: "T"}},
 	}
 	addTable(pdf, tableData, columns, 7)
 }
@@ -166,7 +166,7 @@ func addTotal(pdf *gofpdf.Fpdf, serviceFeeTotal int, adjustments int) {
 		TableText{text: pct(serviceFeeTotal + adjustments), align: "R", border: "T"},
 	})
 
-	gst := serviceFeeTotal + adjustments/10
+	gst := calcGST(serviceFeeTotal, adjustments)
 	tableData = append(tableData, []TableText{blankCell, TableText{text: "GST"},
 		TableText{text: pct(gst), align: "R", border: "B"},
 	})
