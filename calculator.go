@@ -7,42 +7,71 @@ import (
 	"strings"
 )
 
-func calcPayment(payment string, percentage string) (int, error) {
+func pct(v int) string {
+	if v < 0 {
+		return fmt.Sprintf("(%d.%02d)", -v/100, -v%100)
+	}
+	return fmt.Sprintf("%d.%02d", v/100, v%100)
+}
+
+func calcPayment(payment string, gst string, percentage string) (int, int, error) {
 	p, err := dollarStringToCents(payment)
 	if err != nil {
-		return 0, fmt.Errorf("%w %w", ErrAmount, err)
+		return 0, 0, fmt.Errorf("%w %w", ErrAmount, err)
+	}
+	g, err := dollarStringToCents(gst)
+	if err != nil {
+		return 0, 0, fmt.Errorf("%w %w", ErrAmount, err)
 	}
 	perc, err := convertPercToFloat(percentage)
 	if err != nil {
-		return 0, fmt.Errorf("%w %w", ErrPercentage, err)
+		return 0, 0, fmt.Errorf("%w %w", ErrPercentage, err)
 	}
 	//partPay := p
 	if perc <= 0 {
-		return 0, fmt.Errorf("%w %w", ErrPercentage, fmt.Errorf("percentage value must be greater than 0"))
+		return 0, 0, fmt.Errorf("%w %w", ErrPercentage, fmt.Errorf("percentage value must be greater than 0"))
 	}
-	partPay := float64(p) * perc / 100
-	return int(math.Round(partPay)), nil
+	partPay := float64(p*perc) / 10000
+	return int(math.Round(partPay)), p + g, nil
 }
 
-func convertToFloat(value string) (float64, error) {
+func convertToFloat(value string) (int, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return 0, fmt.Errorf("field is blank")
 	}
-	factor := 1.0
+	factor := 1
 	if value[0] == '(' {
-		factor = -1.0
+		factor = -1
 		value = strings.ReplaceAll(value, "(", "")
 		value = strings.ReplaceAll(value, ")", "")
 	}
-	num, err := strconv.ParseFloat(value, 64)
+
+	parts := strings.Split(value, ".")
+	if len(parts) > 2 {
+		return 0, fmt.Errorf("invalid number format")
+	}
+
+	integerPart := parts[0]
+	fractionalPart := "00"
+	if len(parts) == 2 {
+		fractionalPart = parts[1]
+		if len(fractionalPart) > 2 {
+			fractionalPart = fractionalPart[:2]
+		} else if len(fractionalPart) < 2 {
+			fractionalPart = fractionalPart + "0"
+		}
+	}
+
+	combined := integerPart + fractionalPart
+	num, err := strconv.Atoi(combined)
 	if err != nil {
 		return 0, fmt.Errorf("error converting value")
 	}
 	return num * factor, nil
 }
 
-func convertPercToFloat(value string) (float64, error) {
+func convertPercToFloat(value string) (int, error) {
 	value = strings.ReplaceAll(value, "%", "")
 	return convertToFloat(value)
 }
@@ -58,5 +87,5 @@ func dollarStringToCents(dollarStr string) (int, error) {
 	}
 
 	// convert to cents
-	return int(value * 100), nil
+	return value, nil
 }
