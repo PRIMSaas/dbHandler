@@ -62,11 +62,12 @@ type FileProcessingResponse struct {
 type PaymentFileResponse struct {
 	Provider     string     `json:"provider"`
 	Patient      string     `json:"patient"`
+	TransDate    string     `json:"transDate"`
 	InvoiceNo    string     `json:"invoiceNo"`
 	ItemNo       string     `json:"ItemNo"`
 	Service      ServiceCut `json:"service"`
 	Payment      string     `json:"payment"`
-	GST          string     `json:"gst"`
+	GST          int        `json:"gst"`
 	TotalPayment string     `json:"totalPayment"`
 	ServiceFee   string     `json:"serviceFee"`
 }
@@ -92,18 +93,13 @@ func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFe
 	if err != nil {
 		return err
 	}
-	gst, err := dollarStringToCents(details.GST)
-	if err != nil {
-		return err
-	}
-
-	if gst > 0 {
+	if details.GST > 0 {
 		p.PaymentTotalWithGST += payment
 	} else {
 		p.PaymentTotalNoGST += payment
 	}
 	p.ServiceCutTotal += serviceFee
-	p.GSTTotal += gst
+	p.GSTTotal += details.GST
 	return nil
 }
 
@@ -139,6 +135,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	invoiceNum := 4
 	itemNum := 7
 	description := 8
+	transDate := 10
 	GST := 13
 	payment := 14
 	//deposit := 15
@@ -227,7 +224,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 		//
 		// Now we are ready to perform the calculations
 		//
-		billed, totalP, err := calcPayment(record[payment], record[GST], serviceCut)
+		billed, totalP, gst, err := calcPayment(record[payment], record[GST], serviceCut)
 		result := PaymentFileResponse{}
 		plist, exists := providerTotalsMap[record[provider]]
 		if !exists {
@@ -251,6 +248,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 			result = PaymentFileResponse{
 				Provider:  record[provider],
 				Patient:   record[patient],
+				TransDate: record[transDate],
 				InvoiceNo: record[invoiceNum],
 				ItemNo:    itemDesc,
 				Service: ServiceCut{
@@ -258,7 +256,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 					Percentage: serviceCut,
 				},
 				Payment:      record[payment],
-				GST:          record[GST],
+				GST:          gst,
 				TotalPayment: pct(totalP),
 				ServiceFee:   pct(billed),
 			}

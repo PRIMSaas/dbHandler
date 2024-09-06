@@ -148,15 +148,15 @@ func TestConvertPayment(t *testing.T) {
 		{"(123.456)", "(123.45)"},
 	}
 	for _, test := range tests {
-		res, err := convertToFloat(test.input)
+		res, err := convertToInt(test.input)
 		require.NoError(t, err)
 		require.Equal(t, test.output, pct(res))
 	}
-	_, err := convertToFloat("test.input")
+	_, err := convertToInt("test.input")
 	require.Error(t, err)
-	_, err = convertToFloat("123)")
+	_, err = convertToInt("123)")
 	require.Error(t, err)
-	_, err = convertToFloat("1 23)")
+	_, err = convertToInt("1 23)")
 	require.Error(t, err)
 }
 
@@ -199,7 +199,7 @@ func TestCalcPayment(t *testing.T) {
 		{"(80.1)", "0", "5.5%", -441},
 	}
 	for _, test := range tests {
-		res, _, err := calcPayment(test.payment, test.gst, test.percentage)
+		res, _, _, err := calcPayment(test.payment, test.gst, test.percentage)
 		if test.output == 0 {
 			require.Error(t, err)
 		} else {
@@ -259,7 +259,7 @@ func TestCalculator(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, tc.cents, cents)
 
-		res, _, err := calcPayment(tc.dval, "0", tc.perc)
+		res, _, _, err := calcPayment(tc.dval, "0", tc.perc)
 		require.NoError(t, err)
 		require.Equal(t, tc.pcents, res)
 	}
