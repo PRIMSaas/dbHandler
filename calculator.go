@@ -14,25 +14,25 @@ func pct(v int) string {
 	return fmt.Sprintf("%d.%02d", v/100, v%100)
 }
 
-func calcPayment(payment string, gst string, percentage string) (int, int, error) {
+func calcPayment(payment string, gst string, percentage string) (int, int, int, error) {
 	p, err := dollarStringToCents(payment)
 	if err != nil {
-		return 0, 0, fmt.Errorf("%w %w", ErrAmount, err)
+		return 0, 0, 0, fmt.Errorf("%w %w", ErrAmount, err)
 	}
 	g, err := dollarStringToCents(gst)
 	if err != nil {
-		return 0, 0, fmt.Errorf("%w %w", ErrAmount, err)
+		return 0, 0, 0, fmt.Errorf("%w %w", ErrAmount, err)
 	}
 	perc, err := convertPercToFloat(percentage)
 	if err != nil {
-		return 0, 0, fmt.Errorf("%w %w", ErrPercentage, err)
+		return 0, 0, 0, fmt.Errorf("%w %w", ErrPercentage, err)
 	}
 	//partPay := p
-	if perc <= 0 {
-		return 0, 0, fmt.Errorf("%w %w", ErrPercentage, fmt.Errorf("percentage value must be greater than 0"))
+	if perc < 0 {
+		return 0, 0, 0, fmt.Errorf("%w %w", ErrPercentage, fmt.Errorf("percentage value must not be negative"))
 	}
-	partPay := float64(p*perc) / 10000
-	return int(math.Round(partPay)), p + g, nil
+	partPay := float64((p-g)*perc) / 10000
+	return int(math.Round(partPay)), p + g, g, nil
 }
 
 func calcGST(num1 int, num2 int) int {
@@ -41,7 +41,7 @@ func calcGST(num1 int, num2 int) int {
 	return int(math.Round(tenPercent))
 }
 
-func convertToFloat(value string) (int, error) {
+func convertToInt(value string) (int, error) {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return 0, fmt.Errorf("field is blank")
@@ -79,7 +79,7 @@ func convertToFloat(value string) (int, error) {
 
 func convertPercToFloat(value string) (int, error) {
 	value = strings.ReplaceAll(value, "%", "")
-	return convertToFloat(value)
+	return convertToInt(value)
 }
 
 func dollarStringToCents(dollarStr string) (int, error) {
@@ -87,7 +87,7 @@ func dollarStringToCents(dollarStr string) (int, error) {
 	dollarStr = strings.TrimPrefix(dollarStr, "$")
 
 	// Parse the string to a int
-	value, err := convertToFloat(dollarStr)
+	value, err := convertToInt(dollarStr)
 	if err != nil {
 		return 0, fmt.Errorf("invalid dollar amount: %v", err)
 	}

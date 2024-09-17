@@ -84,13 +84,14 @@ GST        string     `json:"gst"`
 ServiceFee string     `json:"serviceFee"`
 */
 func addServiceFeeCalculation(pdf *gofpdf.Fpdf, details PaymentTotals) {
-	columns := []float64{25, 25, 25, 25, 20, 15, 30}
+	columns := []float64{25, 30, 17, 30, 30, 17, 10, 30}
 	tableData := [][]TableText{
 		{
+			TableText{text: "Date", font: Arial12B},
+			TableText{text: "Patient", font: Arial12B},
 			TableText{text: "ItemNo", font: Arial12B},
 			TableText{text: "Payment", align: "R", font: Arial12B},
-			TableText{text: "GST", align: "R", font: Arial12B},
-			TableText{text: "Total", align: "R", font: Arial12B},
+			TableText{text: "with GST", align: "R", font: Arial12B},
 			TableText{text: "Code", align: "R", font: Arial12B},
 			TableText{text: "%", align: "R", font: Arial12B},
 			TableText{text: "Service Fee", align: "R", font: Arial12B}},
@@ -99,27 +100,30 @@ func addServiceFeeCalculation(pdf *gofpdf.Fpdf, details PaymentTotals) {
 	tableData = [][]TableText{}
 	for _, payments := range details.PaymentDetails {
 		itemNo := fmt.Sprintf("%.8s", payments.ItemNo)
-		tableData = append(tableData, []TableText{
-			{text: itemNo},
-			{text: payments.Payment, align: "R"},
-			{text: payments.GST, align: "R"},
-			{text: payments.TotalPayment, align: "R"},
-			{text: payments.Service.Code, align: "R"},
-			{text: payments.Service.Percentage, align: "R"},
-			{text: payments.ServiceFee, align: "R"},
-		})
+		name := fmt.Sprintf("%.12s", payments.Patient)
+		lineData := []TableText{{text: payments.TransDate}, {text: name}, {text: itemNo}}
+		if payments.GST == 0 {
+			lineData = append(lineData, TableText{text: payments.Payment, align: "R"}, blankCell)
+		} else {
+			lineData = append(lineData, blankCell, TableText{text: payments.Payment, align: "R"})
+		}
+		lineData = append(lineData, TableText{text: payments.Service.Code, align: "R"},
+			TableText{text: payments.Service.Percentage, align: "R"},
+			TableText{text: payments.ServiceFee, align: "R"})
+		tableData = append(tableData, lineData)
 	}
 	addTable(pdf, tableData, columns, 5)
 }
 
 func addTotalCalc(pdf *gofpdf.Fpdf, details PaymentTotals) {
-	columns := []float64{25, 25, 25, 25, 20, 15, 30}
+	columns := []float64{25, 30, 17, 30, 30, 17, 10, 30}
 
 	tableData := [][]TableText{
 		{TableText{text: "Totals:", font: Arial12B},
+			blankCell,
+			blankCell,
 			TableText{text: pct(details.PaymentTotalNoGST), align: "R", font: Arial12B, border: "T"},
 			TableText{text: pct(details.PaymentTotalWithGST), align: "R", font: Arial12B, border: "T"},
-			blankCell,
 			blankCell,
 			blankCell,
 			TableText{text: pct(details.ServiceCutTotal), align: "R", font: Arial12B, border: "T"}},
@@ -199,8 +203,8 @@ func addAdjustments(pdf *gofpdf.Fpdf, adjustments []Adjustments, total int) {
 func addPaymentSummary(pdf *gofpdf.Fpdf, paymentTotalWithGST int, paymentTotalNoGST int) {
 	tableData := [][]TableText{
 		{TableText{text: "Tax Statement"}, blankCell, blankCell},
-		{blankCell, TableText{text: "Services with GST"}, TableText{text: pct(paymentTotalWithGST), align: "R"}},
 		{blankCell, TableText{text: "Services without GST"}, TableText{text: pct(paymentTotalNoGST), align: "R"}},
+		{blankCell, TableText{text: "Services with GST"}, TableText{text: pct(paymentTotalWithGST), align: "R"}},
 		{blankCell, TableText{text: "Total"}, TableText{text: pct(paymentTotalWithGST + paymentTotalNoGST), align: "R", border: "T"}}}
 	addTable(pdf, tableData, []float64{40, 110, 0}, 5)
 }
