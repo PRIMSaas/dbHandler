@@ -28,7 +28,8 @@ var (
 )
 var blankCell = TableText{}
 
-func makePdf(provider string, details PaymentTotals, adjustments []Adjustments, companyDetails Address, providerAddr Address) ([]byte, error) {
+func makePdf(provider string, details PaymentTotals, adjustments []Adjustments,
+	companyDetails Address, providerAddr Address, serviceTotals map[string]ServiceTotals) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 	pdf.SetMargins(10, 10, 30)
@@ -52,13 +53,20 @@ func makePdf(provider string, details PaymentTotals, adjustments []Adjustments, 
 
 	pdf.AddPage()
 	pdf.SetMargins(10, 10, 30)
-	//drawGrid(pdf)
 	pdf.SetFont("Arial", "B", 16)
 	pdf.Text(10, 20, "Service Fee Calculations")
 	pdf.SetXY(10, 29)
 	addServiceFeeCalculation(pdf, details)
 	pdf.Ln(3)
 	addTotalCalc(pdf, details)
+
+	pdf.AddPage()
+	pdf.SetMargins(20, 10, 30)
+	//drawGrid(pdf)
+	pdf.SetFont("Arial", "B", 16)
+	pdf.Text(20, 20, "Service Fee Breakdown")
+	pdf.SetXY(20, 29)
+	addServiceFeeBreakdown(pdf, serviceTotals)
 
 	var buf bytes.Buffer
 	err := pdf.Output(&buf)
@@ -72,6 +80,36 @@ func makePdf(provider string, details PaymentTotals, adjustments []Adjustments, 
 	   	}
 	*/
 	return buf.Bytes(), nil
+}
+
+/*
+	type ServiceTotals struct {
+		ServiceCode string `json:"serviceCode"`
+		ExGstFees   int    `json:"exgstfees"`
+		ServiceFees int    `json:"serviceFees"`
+		Rate		int    `json:"rate"`
+	}
+*/
+func addServiceFeeBreakdown(pdf *gofpdf.Fpdf, serviceTotals map[string]ServiceTotals) {
+	columns := []float64{50, 30, 20, 60}
+	tableData := [][]TableText{
+		{
+			blankCell,
+			TableText{text: "Fees ex GST", align: "R", font: Arial12B},
+			TableText{text: "Rate", align: "R", font: Arial12B},
+			TableText{text: "Service Fees ex GST", align: "R", font: Arial12B}},
+	}
+	addTable(pdf, tableData, columns, 4)
+	tableData = [][]TableText{}
+	for code, service := range serviceTotals {
+		tableData = append(tableData, []TableText{
+			{text: code},
+			{text: pct(service.ExGstFees), align: "R"},
+			{text: service.Rate, align: "R"},
+			{text: pct(service.ServiceFees), align: "R"},
+		})
+	}
+	addTable(pdf, tableData, columns, 4)
 }
 
 /*
