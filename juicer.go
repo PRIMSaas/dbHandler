@@ -28,7 +28,7 @@ var (
 )
 var blankCell = TableText{}
 
-func makePdf(provider string, details PaymentTotals, adjustments []Adjustments,
+func makePdf(reportPeriod string, companyName string, provider string, details PaymentTotals, adjustments []Adjustments,
 	companyDetails Address, providerAddr Address, serviceTotals map[string]ServiceTotals) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
@@ -39,11 +39,11 @@ func makePdf(provider string, details PaymentTotals, adjustments []Adjustments,
 	pdf.Text(10, 20, "TAX INVOICE")
 	pdf.ImageOptions("logo.jpg", 150, 20, 35, 35, false, gofpdf.ImageOptions{ImageType: "JPEG", ReadDpi: true}, 0, "")
 	pdf.SetXY(10, 29)
-	addAddress(pdf, companyDetails)
+	addAddress(pdf, companyName, companyDetails)
 	pdf.Ln(10)
 	addAddressDate(pdf, providerAddr, time.Now().Format("02-01-06"))
 	pdf.Ln(10)
-	addInvoiceDetails(pdf, provider, providerAddr.Email, "01/01/2024", "05/05/2024", "JG20240505")
+	addInvoiceDetails(pdf, provider, providerAddr.Email, reportPeriod, "JG20240505")
 	pdf.Ln(10)
 	addTotal(pdf, details.ServiceCutTotal, details.AdjustmentTotal)
 	pdf.Ln(10)
@@ -169,9 +169,12 @@ func addTotalCalc(pdf *gofpdf.Fpdf, details PaymentTotals) {
 	addTable(pdf, tableData, columns, 7)
 }
 
-func addAddress(pdf *gofpdf.Fpdf, address Address) {
+func addAddress(pdf *gofpdf.Fpdf, companyName string, address Address) {
+	if companyName == "" {
+		companyName = address.Name
+	}
 	tableData := [][]TableText{
-		{TableText{text: "From:", font: Arial12B}, TableText{text: address.Name}},
+		{TableText{text: "From:", font: Arial12B}, TableText{text: companyName}},
 		{blankCell, TableText{text: address.StreetAddress}},
 		{blankCell, TableText{text: address.City}},
 		{TableText{text: "ABN", font: Arial12B}, TableText{text: address.ABN}},
@@ -187,10 +190,10 @@ func addAddressDate(pdf *gofpdf.Fpdf, address Address, date string) {
 	}
 	addTable(pdf, tableData, []float64{40, 150, 0}, 5)
 }
-func addInvoiceDetails(pdf *gofpdf.Fpdf, prac string, email string, periodStart string, periodEnd string, invoiceNo string) {
+func addInvoiceDetails(pdf *gofpdf.Fpdf, prac string, email string, invoicePeriod string, invoiceNo string) {
 	tableData := [][]TableText{
 		{TableText{text: "Practitioner:", font: Arial12B}, TableText{text: prac}, TableText{text: "Invoice Number", font: Arial12B, align: "R"}},
-		{TableText{text: "Period:", font: Arial12B}, TableText{text: periodStart + " - " + periodEnd}, TableText{text: invoiceNo, align: "R"}},
+		{TableText{text: "Period:", font: Arial12B}, TableText{text: invoicePeriod}, TableText{text: invoiceNo, align: "R"}},
 		{TableText{text: "Email", font: Arial12B}, TableText{text: email}, blankCell},
 	}
 	addTable(pdf, tableData, []float64{40, 150, 0}, 5)
@@ -200,21 +203,21 @@ func addTotal(pdf *gofpdf.Fpdf, serviceFeeTotal int, adjustments int) {
 	tableData := [][]TableText{
 		{blankCell, TableText{text: "Service Fee (see calculation sheet)"}, TableText{text: pct(serviceFeeTotal), align: "R"}}}
 	if adjustments != 0 {
-		tableData = append(tableData, []TableText{blankCell, TableText{text: "Adjustments"},
-			TableText{text: pct(adjustments), align: "R"},
+		tableData = append(tableData, []TableText{blankCell, {text: "Adjustments"},
+			{text: pct(adjustments), align: "R"},
 		})
 	}
-	tableData = append(tableData, []TableText{blankCell, TableText{text: "Subtotal"},
-		TableText{text: pct(serviceFeeTotal + adjustments), align: "R", border: "T"},
+	tableData = append(tableData, []TableText{blankCell, {text: "Subtotal"},
+		{text: pct(serviceFeeTotal + adjustments), align: "R", border: "T"},
 	})
 
 	gst := calcGST(serviceFeeTotal, adjustments)
-	tableData = append(tableData, []TableText{blankCell, TableText{text: "GST"},
-		TableText{text: pct(gst), align: "R", border: "B"},
+	tableData = append(tableData, []TableText{blankCell, {text: "GST"},
+		{text: pct(gst), align: "R", border: "B"},
 	})
 
-	tableData = append(tableData, []TableText{blankCell, TableText{text: "Total"},
-		TableText{text: pct(serviceFeeTotal + adjustments + gst), align: "R", border: "B"}})
+	tableData = append(tableData, []TableText{blankCell, {text: "Total"},
+		{text: pct(serviceFeeTotal + adjustments + gst), align: "R", border: "B"}})
 	addTable(pdf, tableData, []float64{40, 110, 0}, 5)
 }
 
@@ -233,8 +236,8 @@ func addAdjustments(pdf *gofpdf.Fpdf, adjustments []Adjustments, total int) {
 			{text: amount, align: "R"},
 		})
 	}
-	tableData = append(tableData, []TableText{blankCell, TableText{text: "Total"},
-		TableText{text: pct(total), align: "R", border: "T"}})
+	tableData = append(tableData, []TableText{blankCell, {text: "Total"},
+		{text: pct(total), align: "R", border: "T"}})
 	addTable(pdf, tableData, []float64{40, 110, 0}, 5)
 }
 
