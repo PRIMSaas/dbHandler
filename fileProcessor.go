@@ -88,10 +88,10 @@ type PaymentTotals struct {
 	PdfFile             []byte                `json:"invoice"`
 }
 
-func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFee int) error {
+func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFee int) (int, error) {
 	payment, err := dollarStringToCents(details.Payment)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	if details.GST > 0 {
 		p.PaymentTotalWithGST += payment
@@ -100,6 +100,23 @@ func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFe
 	}
 	p.ServiceCutTotal += serviceFee
 	p.GSTTotal += details.GST
+	return payment, nil
+}
+
+type ServiceTotals struct {
+	ExGstFees   int    `json:"exgstfees"`
+	ServiceFees int    `json:"serviceFees"`
+	Rate        string `json:"rate"`
+}
+
+func (p *ServiceTotals) AddPServiceCodeDetails(rate string, gst int, serviceFee int, payment int) error {
+	if gst > 0 {
+		p.ExGstFees += payment - gst
+	} else {
+		p.ExGstFees += payment
+	}
+	p.ServiceFees += serviceFee
+	p.Rate = rate
 	return nil
 }
 
@@ -148,20 +165,22 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 
 	providerTotalsMap := map[string]PaymentTotals{}
 	providerWithErrors := map[string]string{}
+	sCodeTotalsMap := map[string]ServiceTotals{}
 
-	s, err := truncateCsv(content.FileContent, content.CsvLineStart)
-	if err != nil {
-		return fileRes, err
-	}
-	reader := csv.NewReader(strings.NewReader(s))
+	reader := csv.NewReader(strings.NewReader(content.FileContent))
 	records, err := reader.ReadAll()
 	if err != nil {
 		return fileRes, processError(fmt.Sprintf("Reading csv file failed with error: %v", err))
 	}
+
+	lineNum, records, reportPeriod, companyName, err := getHeaderDetails(records)
+	if err != nil {
+		logError.Printf("Reading csv file failed with error: %v", err)
+	}
+
 	itemMap := createItemMap(content.CodeMap)
 	providerMap := createProviderMap(content.PracMap)
 
-	lineNum := content.CsvLineStart
 	for _, record := range records {
 		lineNum++
 		//
@@ -230,6 +249,10 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 		if !exists {
 			plist = PaymentTotals{Provider: record[provider]}
 		}
+		serviceTotals, exists := sCodeTotalsMap[serviceCode]
+		if !exists {
+			serviceTotals = ServiceTotals{}
+		}
 		if err != nil {
 			if errors.Is(err, ErrAmount) {
 				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
@@ -260,7 +283,12 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 				TotalPayment: pct(totalP),
 				ServiceFee:   pct(billed),
 			}
-			err = plist.AddPaymentDetails(result, billed)
+			fee, err := plist.AddPaymentDetails(result, billed)
+			if err != nil {
+				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
+					record[provider], lineNum, record[payment], err.Error()))
+			}
+			err = serviceTotals.AddPServiceCodeDetails(result.Service.Percentage, result.GST, fee, billed)
 			if err != nil {
 				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
 					record[provider], lineNum, record[payment], err.Error()))
@@ -268,6 +296,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 		}
 		plist.PaymentDetails = append(plist.PaymentDetails, result)
 		providerTotalsMap[record[provider]] = plist
+		sCodeTotalsMap[serviceCode] = serviceTotals
 	}
 	//
 	// Create PDFs, but only if that provider had no errors
@@ -280,7 +309,8 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 					details.AdjustmentTotal += adj.Amount
 				}
 			}
-			pdfBytes, err := makePdf(provider, details, content.AdjustMap[provider], content.CompanyDetails, content.PracDetails[provider])
+			pdfBytes, err := makePdf(reportPeriod, companyName, provider, details, content.AdjustMap[provider],
+				content.CompanyDetails, content.PracDetails[provider], sCodeTotalsMap)
 
 			if err != nil {
 				logError.Printf("Error creating PDF for provider: %v. Cause: %v", provider, err)
@@ -308,20 +338,22 @@ func standardString(s string) string {
 	return strings.ToLower(ns)
 }
 
-func truncateCsv(content string, noneCsvLines int) (string, error) {
-	index := 0
-	for i := 0; i < noneCsvLines-1; i++ {
-		nextNewline := strings.Index(content[index:], "\n")
-		if nextNewline == -1 {
-			ers := fmt.Sprintf("file content has less than %v lines", noneCsvLines)
-			logError.Printf(ers)
-			return "", fmt.Errorf("%s", ers)
+func getHeaderDetails(records [][]string) (int, [][]string, string, string, error) {
+	reportPeriod := ""
+	companyName := ""
+	for i, record := range records {
+		trimmedRecord := strings.ToLower(strings.TrimSpace(record[0]))
+		if strings.Contains(trimmedRecord, "report period:") {
+			startIndex := strings.Index(trimmedRecord, "report period:") + len("report period:")
+			reportPeriod = strings.TrimSpace(trimmedRecord[startIndex:])
+			companyName = strings.TrimSpace(record[15])
 		}
-		index += nextNewline + 1
-	}
 
-	// Slice the string from the noneCsvLines'th newline character
-	return content[index:], nil
+		if strings.Contains(trimmedRecord, "location") {
+			return i + 1, records[i+1:], reportPeriod, companyName, nil
+		}
+	}
+	return 0, records, reportPeriod, companyName, fmt.Errorf("no header found")
 }
 
 // input: CodeMap: map[string][]string{"code1": {"123", "456"}}, {"code2": {"789", "012"}}
