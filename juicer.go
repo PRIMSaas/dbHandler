@@ -120,7 +120,7 @@ func addServiceFeeBreakdown(pdf *gofpdf.Fpdf, serviceTotals map[string]ServiceTo
 	addTable(pdf, tableData, columns, 1)
 
 	tableData = [][]TableText{}
-	tableData = append(tableData, []TableText{{text: "Total"}, {text: cents2DStr(exGstTotal), align: "R", border: "T"}, 
+	tableData = append(tableData, []TableText{{text: "Total"}, {text: cents2DStr(exGstTotal), align: "R", border: "T"},
 		blankCell, {text: cents2DStr(serviceFeeTotal), align: "R", border: "T"}})
 	addTable(pdf, tableData, columns, 7)
 }
