@@ -22,7 +22,12 @@ func ReadTestFile(fileName string) (string, error) {
 	return string(b), nil
 }
 
+// TODO: Add test for the service code totals. This seems too difficult. 
+// A solution would be to add a test file which has already been manually verified.
+// Maybe use PaymentsExport.csv, but it needs payments with GST to cover more permutations.
+
 func TestCalculate1(t *testing.T) {
+	configureLogging()
 	dr1 := "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50),0.00"
 	//dr2 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,91182,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
 	drName := "Dr Aha"
@@ -33,6 +38,8 @@ func TestCalculate1(t *testing.T) {
 		CompanyDetails: addr,
 		CodeMap:        map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
 		PracMap:        map[string]map[string]string{drName: {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
+		PracDetails:    map[string]Address{drName: addr},
+		AdjustMap:      map[string][]Adjustments{drName: {Adjustments{Description: "adjustment1", Amount: 10}, Adjustments{"adjustment1", 5}}},
 	}
 	var res FileProcessingResponse
 	res, err := processFileContent(paymentFile)
@@ -42,6 +49,7 @@ func TestCalculate1(t *testing.T) {
 	require.Equal(t, "80010", res.ChargeDetail[drName].PaymentDetails[0].ItemNo)
 	require.Equal(t, "(224.50)", res.ChargeDetail[drName].PaymentDetails[0].Payment)
 	require.Equal(t, "(67.35)", res.ChargeDetail[drName].PaymentDetails[0].ServiceFee)
+	require.Equal(t, "30", res.ChargeDetail[drName].ServiceCodeSplit["code1"].Rate)
 	require.NotEmpty(t, res)
 }
 
@@ -150,7 +158,7 @@ func TestConvertPayment(t *testing.T) {
 	for _, test := range tests {
 		res, err := convertToInt(test.input)
 		require.NoError(t, err)
-		require.Equal(t, test.output, pct(res))
+		require.Equal(t, test.output, cents2DStr(res))
 	}
 	_, err := convertToInt("test.input")
 	require.Error(t, err)
@@ -186,25 +194,38 @@ func TestCalcPayment(t *testing.T) {
 		payment    string
 		gst        string
 		percentage string
-		output     int
+		exGst      int
+		billed     int
+		totalP     int
+		gstc       int
 	}{
-		{"123.45", "0", "10%", 1235},
-		{"123", "0", "80", 9840},
-		{"123.4", "0", "", 0},
-		{"123.456", "0", "5.0%", 617},
-		{"(123.45)", "0", "10%", -1235},
-		{"(123", "0", "80", -9840},
-		{"(123.4)", "0", "", 0},
-		{"(123.456)", "0", "5.0%", -617},
-		{"(80.1)", "0", "5.5%", -441},
+		// positive numbers, vary payemnt and precentage
+		{"123.45", "0", "10%", 12345, 1235, 12345, 0},
+		{"123", "0", "80", 12300, 9840, 12300, 0},
+		{"123.4", "0", "", 12340, 0, 12340, 0},
+		{"123.456", "0", "5.0%", 12345, 617, 12345, 0},
+		// same as above but negative
+		{"(123.45)", "0", "10%", -12345, -1235, -12345, 0},
+		{"(123", "0", "80", -12300, -9840, -12300, 0},
+		{"(123.4)", "0", "", -12340, 0, -12340, 0},
+		{"(123.456)", "0", "5.0%", -12345, -617, -12345, 0},
+		{"(80.1)", "0", "5.5%", -8010, -441, -8010, 0},
+		// now with gst
+		{"123.45", "10.0", "10%", 11345, 1135, 12345, 1000},
+		{"123", "22.00", "80", 10100, 8080, 12300, 2200},
+		{"(123.4)", "12.3456", "0.8", -13574, -109, -12340, 1234},
 	}
-	for _, test := range tests {
-		res, _, _, err := calcPayment(test.payment, test.gst, test.percentage)
-		if test.output == 0 {
+	for idx, test := range tests {
+		//exGst, fee, totalP, gst, err
+		exGst, fee, totalP, gst, err := calcPayment(test.payment, test.gst, test.percentage)
+		if test.billed == 0 {
 			require.Error(t, err)
 		} else {
 			require.NoError(t, err)
-			require.Equal(t, test.output, res)
+			require.Equal(t, test.exGst, exGst, "Failed calcPayment exGst test %d", idx)
+			require.Equal(t, test.billed, fee, "Failed calcPayment fee test %d", idx)
+			require.Equal(t, test.totalP, totalP, "Failed calcPayment payment conversion test %d", idx)
+			require.Equal(t, test.gstc, gst, "Failed calcPayment gst conversion test %d", idx)
 		}
 	}
 }
@@ -259,7 +280,7 @@ func TestCalculator(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, tc.cents, cents)
 
-		res, _, _, err := calcPayment(tc.dval, "0", tc.perc)
+		_, res, _, _, err := calcPayment(tc.dval, "0", tc.perc)
 		require.NoError(t, err)
 		require.Equal(t, tc.pcents, res)
 	}

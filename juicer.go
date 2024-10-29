@@ -29,7 +29,7 @@ var (
 var blankCell = TableText{}
 
 func makePdf(reportPeriod string, companyName string, provider string, details PaymentTotals, adjustments []Adjustments,
-	companyDetails Address, providerAddr Address, serviceTotals map[string]ServiceTotals) ([]byte, error) {
+	companyDetails Address, providerAddr Address) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 	pdf.SetMargins(10, 10, 30)
@@ -66,7 +66,7 @@ func makePdf(reportPeriod string, companyName string, provider string, details P
 	pdf.SetFont("Arial", "B", 16)
 	pdf.Text(20, 20, "Service Fee Breakdown")
 	pdf.SetXY(20, 29)
-	addServiceFeeBreakdown(pdf, serviceTotals)
+	addServiceFeeBreakdown(pdf, details.ServiceCodeSplit)
 
 	var buf bytes.Buffer
 	err := pdf.Output(&buf)
@@ -95,21 +95,34 @@ func addServiceFeeBreakdown(pdf *gofpdf.Fpdf, serviceTotals map[string]ServiceTo
 	tableData := [][]TableText{
 		{
 			blankCell,
-			TableText{text: "Fees ex GST", align: "R", font: Arial12B},
+			TableText{text: "Payment ex GST", align: "R", font: Arial12B},
 			TableText{text: "Rate", align: "R", font: Arial12B},
 			TableText{text: "Service Fees ex GST", align: "R", font: Arial12B}},
 	}
 	addTable(pdf, tableData, columns, 4)
 	tableData = [][]TableText{}
+	serviceFeeTotal := 0
+	exGstTotal := 0
 	for code, service := range serviceTotals {
 		tableData = append(tableData, []TableText{
 			{text: code},
-			{text: pct(service.ExGstFees), align: "R"},
+			{text: cents2DStr(service.ServiceFees), align: "R"},
 			{text: service.Rate, align: "R"},
-			{text: pct(service.ServiceFees), align: "R"},
+			{text: cents2DStr(service.ExGstFees), align: "R"},
 		})
+		serviceFeeTotal += service.ServiceFees
+		exGstTotal += service.ExGstFees
 	}
-	addTable(pdf, tableData, columns, 4)
+	addTable(pdf, tableData, columns, 5)
+
+	tableData = [][]TableText{}
+	tableData = append(tableData, []TableText{blankCell, blankCell, blankCell})
+	addTable(pdf, tableData, columns, 1)
+
+	tableData = [][]TableText{}
+	tableData = append(tableData, []TableText{{text: "Total"}, {text: cents2DStr(exGstTotal), align: "R", border: "T"}, 
+		blankCell, {text: cents2DStr(serviceFeeTotal), align: "R", border: "T"}})
+	addTable(pdf, tableData, columns, 7)
 }
 
 /*
@@ -160,11 +173,11 @@ func addTotalCalc(pdf *gofpdf.Fpdf, details PaymentTotals) {
 		{TableText{text: "Totals:", font: Arial12B},
 			blankCell,
 			blankCell,
-			TableText{text: pct(details.PaymentTotalNoGST), align: "R", font: Arial12B, border: "T"},
-			TableText{text: pct(details.PaymentTotalWithGST), align: "R", font: Arial12B, border: "T"},
+			TableText{text: cents2DStr(details.PaymentTotalNoGST), align: "R", font: Arial12B, border: "T"},
+			TableText{text: cents2DStr(details.PaymentTotalWithGST), align: "R", font: Arial12B, border: "T"},
 			blankCell,
 			blankCell,
-			TableText{text: pct(details.ServiceCutTotal), align: "R", font: Arial12B, border: "T"}},
+			TableText{text: cents2DStr(details.ServiceCutTotal), align: "R", font: Arial12B, border: "T"}},
 	}
 	addTable(pdf, tableData, columns, 7)
 }
@@ -201,23 +214,23 @@ func addInvoiceDetails(pdf *gofpdf.Fpdf, prac string, email string, invoicePerio
 
 func addTotal(pdf *gofpdf.Fpdf, serviceFeeTotal int, adjustments int) {
 	tableData := [][]TableText{
-		{blankCell, TableText{text: "Service Fee (see calculation sheet)"}, TableText{text: pct(serviceFeeTotal), align: "R"}}}
+		{blankCell, TableText{text: "Service Fee (see calculation sheet)"}, TableText{text: cents2DStr(serviceFeeTotal), align: "R"}}}
 	if adjustments != 0 {
 		tableData = append(tableData, []TableText{blankCell, {text: "Adjustments"},
-			{text: pct(adjustments), align: "R"},
+			{text: cents2DStr(adjustments), align: "R"},
 		})
 	}
 	tableData = append(tableData, []TableText{blankCell, {text: "Subtotal"},
-		{text: pct(serviceFeeTotal + adjustments), align: "R", border: "T"},
+		{text: cents2DStr(serviceFeeTotal + adjustments), align: "R", border: "T"},
 	})
 
 	gst := calcGST(serviceFeeTotal, adjustments)
 	tableData = append(tableData, []TableText{blankCell, {text: "GST"},
-		{text: pct(gst), align: "R", border: "B"},
+		{text: cents2DStr(gst), align: "R", border: "B"},
 	})
 
 	tableData = append(tableData, []TableText{blankCell, {text: "Total"},
-		{text: pct(serviceFeeTotal + adjustments + gst), align: "R", border: "B"}})
+		{text: cents2DStr(serviceFeeTotal + adjustments + gst), align: "R", border: "B"}})
 	addTable(pdf, tableData, []float64{40, 110, 0}, 5)
 }
 
@@ -229,7 +242,7 @@ func addAdjustments(pdf *gofpdf.Fpdf, adjustments []Adjustments, total int) {
 	tableData := [][]TableText{
 		{TableText{text: "Adjustments"}, blankCell, blankCell}}
 	for _, payments := range adjustments {
-		amount := pct(payments.Amount)
+		amount := cents2DStr(payments.Amount)
 		tableData = append(tableData, []TableText{
 			blankCell,
 			{text: payments.Description},
@@ -237,16 +250,16 @@ func addAdjustments(pdf *gofpdf.Fpdf, adjustments []Adjustments, total int) {
 		})
 	}
 	tableData = append(tableData, []TableText{blankCell, {text: "Total"},
-		{text: pct(total), align: "R", border: "T"}})
+		{text: cents2DStr(total), align: "R", border: "T"}})
 	addTable(pdf, tableData, []float64{40, 110, 0}, 5)
 }
 
 func addPaymentSummary(pdf *gofpdf.Fpdf, paymentTotalWithGST int, paymentTotalNoGST int) {
 	tableData := [][]TableText{
 		{TableText{text: "Tax Statement"}, blankCell, blankCell},
-		{blankCell, TableText{text: "Services without GST"}, TableText{text: pct(paymentTotalNoGST), align: "R"}},
-		{blankCell, TableText{text: "Services with GST"}, TableText{text: pct(paymentTotalWithGST), align: "R"}},
-		{blankCell, TableText{text: "Total"}, TableText{text: pct(paymentTotalWithGST + paymentTotalNoGST), align: "R", border: "T"}}}
+		{blankCell, TableText{text: "Services without GST"}, TableText{text: cents2DStr(paymentTotalNoGST), align: "R"}},
+		{blankCell, TableText{text: "Services with GST"}, TableText{text: cents2DStr(paymentTotalWithGST), align: "R"}},
+		{blankCell, TableText{text: "Total"}, TableText{text: cents2DStr(paymentTotalWithGST + paymentTotalNoGST), align: "R", border: "T"}}}
 	addTable(pdf, tableData, []float64{40, 110, 0}, 5)
 }
 

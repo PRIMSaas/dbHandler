@@ -78,29 +78,25 @@ type Adjustments struct {
 }
 
 type PaymentTotals struct {
-	Provider            string                `json:"provider"`
-	PaymentDetails      []PaymentFileResponse `json:"paymentDetails"`
-	PaymentTotalWithGST int                   `json:"paymentTotal"`
-	PaymentTotalNoGST   int                   `json:"PaymentTotalWithGST"`
-	ServiceCutTotal     int                   `json:"serviceCutTotal"`
-	GSTTotal            int                   `json:"gstTotal"`
-	AdjustmentTotal     int                   `json:"adjustmentTotal"`
-	PdfFile             []byte                `json:"invoice"`
+	Provider            string                   `json:"provider"`
+	PaymentDetails      []PaymentFileResponse    `json:"paymentDetails"`
+	PaymentTotalWithGST int                      `json:"paymentTotal"`
+	PaymentTotalNoGST   int                      `json:"PaymentTotalWithGST"`
+	ServiceCutTotal     int                      `json:"serviceCutTotal"`
+	GSTTotal            int                      `json:"gstTotal"`
+	AdjustmentTotal     int                      `json:"adjustmentTotal"`
+	PdfFile             []byte                   `json:"invoice"`
+	ServiceCodeSplit    map[string]ServiceTotals `json:"serviceCodeSplit"`
 }
 
-func (p *PaymentTotals) AddPaymentDetails(details PaymentFileResponse, serviceFee int) (int, error) {
-	payment, err := dollarStringToCents(details.Payment)
-	if err != nil {
-		return 0, err
-	}
-	if details.GST > 0 {
+func (p *PaymentTotals) TotalPayments(gst int, payment int, serviceFee int) {
+	if gst > 0 {
 		p.PaymentTotalWithGST += payment
 	} else {
 		p.PaymentTotalNoGST += payment
 	}
 	p.ServiceCutTotal += serviceFee
-	p.GSTTotal += details.GST
-	return payment, nil
+	p.GSTTotal += gst
 }
 
 type ServiceTotals struct {
@@ -109,15 +105,10 @@ type ServiceTotals struct {
 	Rate        string `json:"rate"`
 }
 
-func (p *ServiceTotals) AddPServiceCodeDetails(rate string, gst int, serviceFee int, payment int) error {
-	if gst > 0 {
-		p.ExGstFees += payment - gst
-	} else {
-		p.ExGstFees += payment
-	}
+func (p *ServiceTotals) TotalServiceCodes(rate string, serviceFee int, payment int) {
+	p.ExGstFees += payment
 	p.ServiceFees += serviceFee
 	p.Rate = rate
-	return nil
 }
 
 var (
@@ -165,7 +156,6 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 
 	providerTotalsMap := map[string]PaymentTotals{}
 	providerWithErrors := map[string]string{}
-	sCodeTotalsMap := map[string]ServiceTotals{}
 
 	reader := csv.NewReader(strings.NewReader(content.FileContent))
 	records, err := reader.ReadAll()
@@ -190,12 +180,6 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 		if prov == "" {
 			continue
 		}
-		// Check if the company name is in the record
-		// is the same as in the request, if not skip
-		//	if !compareNames(record[location], content.CompanyName) {
-		//		continue
-		//	}
-		// providerServiceCodes := map[string]string{}
 		providerServiceCodes, ok := providerMap[standardString(prov)]
 		if !ok {
 			fileRes.MissingProviders[prov] = standardString(prov)
@@ -240,19 +224,8 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 		if _, exists := providerWithErrors[prov]; exists {
 			continue
 		}
-		//
-		// Now we are ready to perform the calculations
-		//
-		billed, totalP, gst, err := calcPayment(record[payment], record[GST], serviceCut)
-		result := PaymentFileResponse{}
-		plist, exists := providerTotalsMap[record[provider]]
-		if !exists {
-			plist = PaymentTotals{Provider: record[provider]}
-		}
-		serviceTotals, exists := sCodeTotalsMap[serviceCode]
-		if !exists {
-			serviceTotals = ServiceTotals{}
-		}
+		// Make the calculations for the service fee and exGst
+		exGst, feeCents, paymentCents, gstCents, err := calcPayment(record[payment], record[GST], serviceCut)
 		if err != nil {
 			if errors.Is(err, ErrAmount) {
 				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
@@ -261,45 +234,46 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
 					record[provider], lineNum, serviceCut, err.Error()))
 			} else {
-				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v with amount: %v and parcentage %v failed due to unknown error: %v",
+				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v with amount: %v and percentage %v failed due to unknown error: %v",
 					record[provider], lineNum, record[payment], serviceCut, err.Error()))
 			}
-		} else {
-			//
-			// Prepare the response to be sent back
-			//
-			result = PaymentFileResponse{
-				Provider:  record[provider],
-				Patient:   record[patient],
-				TransDate: record[transDate],
-				InvoiceNo: record[invoiceNum],
-				ItemNo:    itemDesc,
-				Service: ServiceCut{
-					Code:       serviceCode,
-					Percentage: serviceCut,
-				},
-				Payment:      record[payment],
-				GST:          gst,
-				TotalPayment: pct(totalP),
-				ServiceFee:   pct(billed),
-			}
-			fee, err := plist.AddPaymentDetails(result, billed)
-			if err != nil {
-				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
-					record[provider], lineNum, record[payment], err.Error()))
-			}
-			err = serviceTotals.AddPServiceCodeDetails(result.Service.Percentage, result.GST, fee, billed)
-			if err != nil {
-				return fileRes, processError(fmt.Sprintf("provider: %v in line: %v value: %v. Cause: %v",
-					record[provider], lineNum, record[payment], err.Error()))
-			}
 		}
-		plist.PaymentDetails = append(plist.PaymentDetails, result)
-		providerTotalsMap[record[provider]] = plist
-		sCodeTotalsMap[serviceCode] = serviceTotals
+		// Create the maps storing totals and individual payments
+		providerPaymentMap, exists := providerTotalsMap[record[provider]]
+		if !exists {
+			providerPaymentMap = PaymentTotals{Provider: record[provider]}
+			providerPaymentMap.ServiceCodeSplit = make(map[string]ServiceTotals)
+		}
+		serviceTotals, exists := providerPaymentMap.ServiceCodeSplit[serviceCode]
+		if !exists {
+			serviceTotals = ServiceTotals{}
+		}
+		// Add the totals and the payment details
+		providerPaymentMap.TotalPayments(gstCents, paymentCents, feeCents)
+		serviceTotals.TotalServiceCodes(serviceCut, exGst, feeCents)
+
+		result := PaymentFileResponse{
+			Provider:  record[provider],
+			Patient:   record[patient],
+			TransDate: record[transDate],
+			InvoiceNo: record[invoiceNum],
+			ItemNo:    itemDesc,
+			Service: ServiceCut{
+				Code:       serviceCode,
+				Percentage: serviceCut,
+			},
+			Payment:      record[payment],
+			GST:          gstCents,
+			TotalPayment: cents2DStr(paymentCents),
+			ServiceFee:   cents2DStr(feeCents),
+		}
+		providerPaymentMap.PaymentDetails = append(providerPaymentMap.PaymentDetails, result)
+		providerPaymentMap.ServiceCodeSplit[serviceCode] = serviceTotals
+		providerTotalsMap[record[provider]] = providerPaymentMap
 	}
 	//
 	// Create PDFs, but only if that provider had no errors
+	// If there are adjustments for that provider, add them to the PDF
 	//
 	for provider, details := range providerTotalsMap {
 		if _, exists := providerWithErrors[provider]; !exists {
@@ -310,7 +284,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 				}
 			}
 			pdfBytes, err := makePdf(reportPeriod, companyName, provider, details, content.AdjustMap[provider],
-				content.CompanyDetails, content.PracDetails[provider], sCodeTotalsMap)
+				content.CompanyDetails, content.PracDetails[provider])
 
 			if err != nil {
 				logError.Printf("Error creating PDF for provider: %v. Cause: %v", provider, err)
@@ -325,7 +299,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 }
 
 func processError(err string) error {
-	logError.Printf(err)
+	logError.Print(err)
 	return fmt.Errorf("%s", err)
 
 }
