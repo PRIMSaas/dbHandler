@@ -33,19 +33,19 @@ func processFile(writer http.ResponseWriter, request *http.Request) {
 		http.Error(writer, errStr, http.StatusUnprocessableEntity)
 		return
 	}
+	// On success, set the Content-Type header to application/json
+	writer.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(writer).Encode(resp)
 	if err != nil {
 		errStr := fmt.Sprintf("Error encoding response body: %v", err)
 		http.Error(writer, errStr, http.StatusInternalServerError)
 		return
 	}
-	// On success, set the Content-Type header to application/json
-	writer.Header().Set("Content-Type", "application/json")
 	duration := time.Since(start)
 	logInfo.Printf("Processing file took: %v", duration)
 }
 
-func runHttpApi(port int, maxClients int) {
+func runHttpApi(port int) {
 	httpAddress := fmt.Sprintf("0.0.0.0:%d", port)
 
 	co := cors.Options{
@@ -60,7 +60,7 @@ func runHttpApi(port int, maxClients int) {
 		co.Debug = true
 	}
 	c := cors.New(co)
-	logInfo.Printf("Starting HTTP server: %s with max clients: %d", httpAddress, maxClients)
+	logInfo.Printf("Starting HTTP server: %s", httpAddress)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/processFile", processFile)
 	mux.HandleFunc("/profile", pprof.Profile)
