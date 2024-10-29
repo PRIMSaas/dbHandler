@@ -22,7 +22,7 @@ func ReadTestFile(fileName string) (string, error) {
 	return string(b), nil
 }
 
-// TODO: Add test for the service code totals. This seems too difficult. 
+// TODO: Add test for the service code totals. This seems too difficult.
 // A solution would be to add a test file which has already been manually verified.
 // Maybe use PaymentsExport.csv, but it needs payments with GST to cover more permutations.
 
@@ -57,8 +57,7 @@ func TestCalcErrorItemMappingServiceCode(t *testing.T) {
 	configureLogging()
 	goodCode := "code1"
 	dr1 := "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50),0.00"
-	//dr2 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,91182,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
-
+	
 	drName := "Dr Aha"
 	paymentFile := PaymentFile{
 		FileContent:    dr1, // + "\n" + dr2,
@@ -100,6 +99,28 @@ func TestCalcErrorItemMappingServiceCode(t *testing.T) {
 	require.True(t, ok)
 	// restore the good code
 	paymentFile.PracMap[drName][goodCode] = "30"
+}
+
+func TestMissingItemNr(t *testing.T) {
+	configureLogging()
+	dr1 := "B Practice,Dr Buhu,Irrelevant,Patient Name,162436,174678,72714,,\"Psychological therapy health service provided by phone\",Reversed payment,26/02/2024,Direct Credit,Private,0.00,(224.50),0.00"
+
+	drName := "Dr Aha"
+	paymentFile := PaymentFile{
+		FileContent:    dr1,
+		CsvLineStart:   0,
+		CompanyDetails: addr,
+		CodeMap:        map[string][]string{"code1": {"80010", "456"}, "code2": {"789", "012"}},
+		PracMap:        map[string]map[string]string{drName: {"code1": "30", "code2": "20"}, "Dr Buhu": {"code1": "40", "code2": "30"}},
+	}
+	var res FileProcessingResponse
+	res, err := processFileContent(paymentFile)
+	require.NoError(t, err)
+	require.Empty(t, res.NoItemNrs)
+	require.Empty(t, res.MissingServiceCodes)
+	require.NotEmpty(t, res.MissingItemNrs)
+	require.NotEmpty(t, res.MissingItemNrs["Psychological therapy health service provided by phone"])
+
 }
 
 func TestCalcErrorBadNumbers(t *testing.T) {
