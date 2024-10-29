@@ -53,7 +53,7 @@ func main() {
 
 	gApp = initApp(keys)
 
-	runHttpApi(PORT, 100)
+	runHttpApi(PORT)
 }
 
 func initStart(key string, config string) {
