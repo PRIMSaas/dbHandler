@@ -201,7 +201,8 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 				fileRes.MissingItemNrs[itemNr] = itemNr
 			}
 			providerWithErrors[provider] = provider
-		}		//
+		}
+		//
 		// Once we have a service code, get the percentage per provider for that service code
 		//
 		serviceCut, ok := providerServiceCodes[serviceCode]
