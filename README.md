@@ -43,14 +43,23 @@ do a **make clean** first! <br>
 docker build -t drjimdb . <br>
 verbose: docker build --no-cache --progress=plain -t drjimdb . <br>
 clean up the mess: docker build --rm or docker rmi $(docker images -f “dangling=true” -q) <br>
-gcp<br>
+
+## Clouding
+First: Install **gcloud** then run **gcloud init** <br>
+Test: gcloud artifacts docker images list  australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb <br>
+
+For docker to access the gcp repo run: **gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://australia-southeast2-docker.pkg.dev**
+
+Now you can do cool things like: <br>
 docker tag drjimdb australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb <br>
 docker push australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb <br>
-gcloud artifacts docker images list  australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb <br>
-running<br>
-command line: <br>
+OR <br>
+Just run **make cloud** and it's all done for you <br>
+
+## Running
+### command line:
 ./dbHandler ./config <br>
-container run: <br>
+### container run:
 docker-compose up -d<br>
 docker run --entrypoint /bin/bash -it drjimdb <br>
 
