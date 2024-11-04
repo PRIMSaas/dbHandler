@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -57,6 +59,7 @@ type FileProcessingResponse struct {
 	NoItemNrs           map[string]string            `json:"noItemNrs"`
 	MissingServiceCodes map[string]map[string]string `json:"missingServiceCodes"`
 	ChargeDetail        map[string]PaymentTotals     `json:"chargeDetail"`
+	InvoicePackage      []byte                       `json:"invoicePackage"`
 }
 
 type PaymentFileResponse struct {
@@ -292,6 +295,10 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 		}
 	}
 	fileRes.ChargeDetail = providerTotalsMap
+	fileRes.InvoicePackage, err = createZipFile(providerTotalsMap)
+	if err != nil {
+		logError.Printf("Error creating zip file. Cause: %v", err)
+	}
 	return fileRes, nil
 }
 
@@ -344,4 +351,27 @@ func createProviderMap(pracMap map[string]map[string]string) map[string]map[stri
 		result[standardString(provider)] = serviceCodes
 	}
 	return result
+}
+
+func createZipFile(paymentDetails map[string]PaymentTotals) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(buf)
+	defer zipWriter.Close()
+
+	for provider, details := range paymentDetails {
+		provider = strings.ReplaceAll(provider, " ", "_") + "_Invoice" + ".pdf"
+		zipFileWriter, err := zipWriter.Create(provider)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = zipFileWriter.Write(details.PdfFile)
+		if err != nil {
+			fmt.Println(err)
+			return nil, err
+		}
+	}
+	zipWriter.Close()
+
+	return buf.Bytes(), nil
 }
