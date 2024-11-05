@@ -275,6 +275,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	// Create PDFs, but only if that provider had no errors
 	// If there are adjustments for that provider, add them to the PDF
 	//
+	gotAtLeastOneInvoice := false
 	for provider, details := range providerTotalsMap {
 		if _, exists := providerWithErrors[provider]; !exists {
 			if content.AdjustMap[provider] != nil {
@@ -289,13 +290,18 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 			if err != nil {
 				logError.Printf("Error creating PDF for provider: %v. Cause: %v", provider, err)
 			}
-			details.PdfFile = pdfBytes
+			if len(pdfBytes) > 0 {
+				details.PdfFile = pdfBytes
+				gotAtLeastOneInvoice = true
+			}
 			details.Provider = provider
 			providerTotalsMap[provider] = details
 		}
 	}
 	fileRes.ChargeDetail = providerTotalsMap
-	fileRes.InvoicePackage, err = createZipFile(providerTotalsMap)
+	if gotAtLeastOneInvoice {
+		fileRes.InvoicePackage, err = createZipFile(providerTotalsMap)
+	}
 	if err != nil {
 		logError.Printf("Error creating zip file. Cause: %v", err)
 	}
@@ -364,14 +370,14 @@ func createZipFile(paymentDetails map[string]PaymentTotals) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-
+		if len(details.PdfFile) == 0 {
+			continue
+		}
 		_, err = zipFileWriter.Write(details.PdfFile)
 		if err != nil {
 			fmt.Println(err)
 			return nil, err
 		}
 	}
-	zipWriter.Close()
-
 	return buf.Bytes(), nil
 }
