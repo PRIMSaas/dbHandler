@@ -362,16 +362,15 @@ func createProviderMap(pracMap map[string]map[string]string) map[string]map[stri
 func createZipFile(paymentDetails map[string]PaymentTotals) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	zipWriter := zip.NewWriter(buf)
-	defer zipWriter.Close()
 
 	for provider, details := range paymentDetails {
+		if len(details.PdfFile) == 0 {
+			continue
+		}
 		provider = strings.ReplaceAll(provider, " ", "_") + "_Invoice" + ".pdf"
 		zipFileWriter, err := zipWriter.Create(provider)
 		if err != nil {
 			return nil, err
-		}
-		if len(details.PdfFile) == 0 {
-			continue
 		}
 		_, err = zipFileWriter.Write(details.PdfFile)
 		if err != nil {
@@ -379,5 +378,6 @@ func createZipFile(paymentDetails map[string]PaymentTotals) ([]byte, error) {
 			return nil, err
 		}
 	}
+	zipWriter.Close()
 	return buf.Bytes(), nil
 }
