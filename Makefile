@@ -12,8 +12,7 @@ tidy:
 vend:
 	go mod vendor
 
-build:
-	rm -f dbHandler 
+build: clean
 	go build
 
 test:
@@ -22,28 +21,23 @@ test:
 vet:
 	go vet
 
-docker:
-	docker build -t drjimdb .
-
-cloud: docker
-	docker tag drjimdb australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb
-	docker push australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb	
-
-run:
-	docker-compose up -d
-	
 lint:
 	golangci-lint run --disable typecheck --disable unused 
 
 cover:
 	go tool cover -func=c.out
 
-local:
+# Next docker and deploy or run
+
+docker: build
 	docker build -t drjimdb .
 
-deploy:	local
+run:
+	docker-compose up -d
+
+cloud: docker
 	docker tag drjimdb australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb
-	docker push australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb
+	docker push australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb	
 
 .PHONY: all clean it fmt tidy build test vet lint cover
 
