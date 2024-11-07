@@ -91,13 +91,12 @@ func makePdf(reportPeriod string, companyName string, provider string, details P
 	}
 */
 func addServiceFeeBreakdown(pdf *gofpdf.Fpdf, serviceTotals map[string]ServiceTotals) {
-	columns := []float64{50, 30, 20, 60}
+	columns := []float64{50, 30, 30, 50}
 	tableData := [][]TableText{
-		{
-			blankCell,
-			TableText{text: "Payment ex GST", align: "R", font: Arial12B},
-			TableText{text: "Rate", align: "R", font: Arial12B},
-			TableText{text: "Service Fees ex GST", align: "R", font: Arial12B}},
+		{blankCell,
+			{text: "Payment ex GST", align: "R", font: Arial12B},
+			{text: "Rate %", align: "R", font: Arial12B},
+			{text: "Service Fees ex GST", align: "R", font: Arial12B}},
 	}
 	addTable(pdf, tableData, columns, 4)
 	tableData = [][]TableText{}
@@ -106,22 +105,20 @@ func addServiceFeeBreakdown(pdf *gofpdf.Fpdf, serviceTotals map[string]ServiceTo
 	for code, service := range serviceTotals {
 		tableData = append(tableData, []TableText{
 			{text: code},
-			{text: cents2DStr(service.ServiceFees), align: "R"},
-			{text: service.Rate, align: "R"},
 			{text: cents2DStr(service.ExGstFees), align: "R"},
+			{text: service.Rate, align: "R"},
+			{text: cents2DStr(service.ServiceFees), align: "R"},
 		})
 		serviceFeeTotal += service.ServiceFees
 		exGstTotal += service.ExGstFees
 	}
 	addTable(pdf, tableData, columns, 5)
 
-	tableData = [][]TableText{}
-	tableData = append(tableData, []TableText{blankCell, blankCell, blankCell})
+	tableData = [][]TableText{{blankCell, blankCell, blankCell}}
 	addTable(pdf, tableData, columns, 1)
 
-	tableData = [][]TableText{}
-	tableData = append(tableData, []TableText{{text: "Total"}, {text: cents2DStr(exGstTotal), align: "R", border: "T"},
-		blankCell, {text: cents2DStr(serviceFeeTotal), align: "R", border: "T"}})
+	tableData = [][]TableText{{{text: "Total"}, {text: cents2DStr(serviceFeeTotal), align: "R", border: "T"},
+		blankCell, {text: cents2DStr(exGstTotal), align: "R", border: "T"}}}
 	addTable(pdf, tableData, columns, 7)
 }
 

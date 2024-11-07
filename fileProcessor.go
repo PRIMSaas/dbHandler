@@ -1,6 +1,8 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/csv"
 	"errors"
 	"fmt"
@@ -57,6 +59,7 @@ type FileProcessingResponse struct {
 	NoItemNrs           map[string]string            `json:"noItemNrs"`
 	MissingServiceCodes map[string]map[string]string `json:"missingServiceCodes"`
 	ChargeDetail        map[string]PaymentTotals     `json:"chargeDetail"`
+	InvoicePackage      []byte                       `json:"invoicePackage"`
 }
 
 type PaymentFileResponse struct {
@@ -201,7 +204,8 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 				fileRes.MissingItemNrs[itemNr] = itemNr
 			}
 			providerWithErrors[provider] = provider
-		}		//
+		}
+		//
 		// Once we have a service code, get the percentage per provider for that service code
 		//
 		serviceCut, ok := providerServiceCodes[serviceCode]
@@ -271,6 +275,7 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	// Create PDFs, but only if that provider had no errors
 	// If there are adjustments for that provider, add them to the PDF
 	//
+	gotAtLeastOneInvoice := false
 	for provider, details := range providerTotalsMap {
 		if _, exists := providerWithErrors[provider]; !exists {
 			if content.AdjustMap[provider] != nil {
@@ -285,12 +290,21 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 			if err != nil {
 				logError.Printf("Error creating PDF for provider: %v. Cause: %v", provider, err)
 			}
-			details.PdfFile = pdfBytes
+			if len(pdfBytes) > 0 {
+				details.PdfFile = pdfBytes
+				gotAtLeastOneInvoice = true
+			}
 			details.Provider = provider
 			providerTotalsMap[provider] = details
 		}
 	}
 	fileRes.ChargeDetail = providerTotalsMap
+	if gotAtLeastOneInvoice {
+		fileRes.InvoicePackage, err = createZipFile(providerTotalsMap)
+	}
+	if err != nil {
+		logError.Printf("Error creating zip file. Cause: %v", err)
+	}
 	return fileRes, nil
 }
 
@@ -343,4 +357,27 @@ func createProviderMap(pracMap map[string]map[string]string) map[string]map[stri
 		result[standardString(provider)] = serviceCodes
 	}
 	return result
+}
+
+func createZipFile(paymentDetails map[string]PaymentTotals) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(buf)
+
+	for provider, details := range paymentDetails {
+		if len(details.PdfFile) == 0 {
+			continue
+		}
+		provider = strings.ReplaceAll(provider, " ", "_") + "_Invoice" + ".pdf"
+		zipFileWriter, err := zipWriter.Create(provider)
+		if err != nil {
+			return nil, err
+		}
+		_, err = zipFileWriter.Write(details.PdfFile)
+		if err != nil {
+			fmt.Println(err)
+			return nil, err
+		}
+	}
+	zipWriter.Close()
+	return buf.Bytes(), nil
 }

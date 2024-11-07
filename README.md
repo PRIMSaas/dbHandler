@@ -1,21 +1,12 @@
 # dbHandler
-Manages the interface to firestore db <br>
-
-All data passed in and out must be primitive types or arrays. <br>
-All APIs need to return a result and an error string <br>
-
-## Testing
-Tests require the firestore emulators to be running<br>
-**firebase emulators:start --project drjim-f2087** <br>
-
-It will start the emulator automatically if not running, but firebase has to be already installed <br>
+Performs all the calculations required to produce invoice related documents.<br> 
 
 ## Local container testing
 
 Build code with **make** <br>
 build container with **docker build -t drjimdb .** <br>
 Run container locally **docker compose up** <br><br>
-Install into cloud run: **make deploy**
+Install into cloud run: **make cloud**
 
 ## Call APIs for testing
 Suggester order: 
@@ -39,18 +30,25 @@ curl -i -H "Origin: http://127.0.0.1:5055" -H "Access-Control-Request-Method: PO
 To view the firestore content **http://127.0.0.1:4000/firestore/**<br>
 
 ## Dockering
-do a **make clean** first! <br>
-docker build -t drjimdb . <br>
 verbose: docker build --no-cache --progress=plain -t drjimdb . <br>
 clean up the mess: docker build --rm or docker rmi $(docker images -f “dangling=true” -q) <br>
-gcp<br>
+
+## Clouding
+First: Install **gcloud** then run **gcloud init** <br>
+Test: gcloud artifacts docker images list  australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb <br>
+
+For docker to access the gcp repo run: **gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://australia-southeast2-docker.pkg.dev**
+
+Now you can do cool things like: <br>
 docker tag drjimdb australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb <br>
 docker push australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb <br>
-gcloud artifacts docker images list  australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb <br>
-running<br>
-command line: <br>
+OR <br>
+Just run **make cloud** and it's all done for you <br>
+
+## Running
+### command line:
 ./dbHandler ./config <br>
-container run: <br>
+### container run:
 docker-compose up -d<br>
 docker run --entrypoint /bin/bash -it drjimdb <br>
 
