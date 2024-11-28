@@ -1,0 +1,65 @@
+{
+  "containerDefinitions": [
+    {
+      "name": "drjimdbContainer",
+      "image": "600073216458.dkr.ecr.ap-southeast-2.amazonaws.com/jimrepo:latest",
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 8088,
+          "hostPort": 8088,
+          "protocol": "tcp"
+        }
+      ],
+      "essential": true,
+      "environment": [],
+      "environmentFiles": [],
+      "mountPoints": [
+        {
+          "sourceVolume": "secret",
+          "containerPath": "/secret",
+          "readOnly": true
+        },
+        {
+          "sourceVolume": "config",
+          "containerPath": "/config",
+          "readOnly": true
+        }
+      ],
+      "volumesFrom": [],
+      "ulimits": [],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/drjimdbTask",
+          "mode": "non-blocking",
+          "awslogs-create-group": "true",
+          "max-buffer-size": "25m",
+          "awslogs-region": "ap-southeast-2",
+          "awslogs-stream-prefix": "ecs"
+        },
+        "secretOptions": []
+      },
+      "systemControls": []
+    }
+  ],
+  "family": "drjimdbTask",
+  "executionRoleArn": "arn:aws:iam::600073216458:role/ecsTaskExecutionRole",
+  "networkMode": "awsvpc",
+  "volumes": [
+    {
+      "name": "secret",
+      "host": {}
+    },
+    {
+      "name": "config",
+      "host": {}
+    }
+  ],
+  "placementConstraints": [],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "1024",
+  "memory": "2048"
+}
