@@ -16,7 +16,7 @@ Suggester order:
 <br><br>
 Test APIS - beware in cloud run you leave out the port number: <br>
 
-curl -i -d '{"fileContent":"This is an awesome file ...", "serviceCodes":["one", "two"]}' -X POST http://localhost:8088/processFile <br>
+curl -i -d '{"fileContent":"Vermont Medical Clinic,Dr Fiona Chao,Irrelevant,Patient Name,164055,176395,72939,36,\"Surgery consultation, Level C\",Payment,26/02/2024,Direct Credit,Medicare,8,80.1,0", "serviceCodes":["one", "two"]}' -X POST http://3.27.224.4:8088/processFile <br>
 
 curl -i -d @curly.json -X POST https://drjimdb-5f6uwrh2eq-ts.a.run.app/processFile<br>
 
@@ -33,7 +33,7 @@ To view the firestore content **http://127.0.0.1:4000/firestore/**<br>
 verbose: docker build --no-cache --progress=plain -t drjimdb . <br>
 clean up the mess: docker build --rm or docker rmi $(docker images -f “dangling=true” -q) <br>
 
-## Clouding
+## gc Clouding
 First: Install **gcloud** then run **gcloud init** <br>
 Test: gcloud artifacts docker images list  australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb <br>
 
@@ -44,6 +44,11 @@ docker tag drjimdb australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drj
 docker push australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb <br>
 OR <br>
 Just run **make cloud** and it's all done for you <br>
+
+## AWS clouding
+aws ecr get-login-password --region ap-southeast-2 | docker login --username AWS --password-stdin 600073216458.dkr.ecr.ap-southeast-2.amazonaws.com <br>
+docker tag drjimdb:latest 600073216458.dkr.ecr.ap-southeast-2.amazonaws.com/jimrepo:latest <br>
+jim@superNUC:~/dev/cloud/dbHandler$ docker push 600073216458.dkr.ecr.ap-southeast-2.amazonaws.com/jimrepo:latest <br>
 
 ## Running
 ### command line:

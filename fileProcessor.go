@@ -174,6 +174,10 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	providerMap := createProviderMap(content.PracMap)
 
 	for _, record := range records {
+		if len(record) < paymentField {
+			logError.Printf("Reading csv file failed with error: not enough fields in line: %v", lineNum)
+			continue
+		}
 		lineNum++
 		//
 		// Skip blank lines
