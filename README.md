@@ -48,7 +48,9 @@ Just run **make cloud** and it's all done for you <br>
 ## AWS clouding
 aws ecr get-login-password --region ap-southeast-2 | docker login --username AWS --password-stdin 600073216458.dkr.ecr.ap-southeast-2.amazonaws.com <br>
 docker tag drjimdb:latest 600073216458.dkr.ecr.ap-southeast-2.amazonaws.com/jimrepo:latest <br>
-jim@superNUC:~/dev/cloud/dbHandler$ docker push 600073216458.dkr.ecr.ap-southeast-2.amazonaws.com/jimrepo:latest <br>
+docker push 600073216458.dkr.ecr.ap-southeast-2.amazonaws.com/jimrepo:latest <br>
+<br>
+curl -i -d '{"fileContent":"Vermont Medical Clinic,Dr Fiona Chao,Irrelevant,Patient Name,164055,176395,72939,36,\"Surgery consultation, Level C\",Payment,26/02/2024,Direct Credit,Medicare,8,80.1,0", "serviceCodes":["one", "two"]}' -X POST https://2g8q5vd707.execute-api.ap-southeast-2.amazonaws.com/processFile<br>
 
 ## Running
 ### command line:

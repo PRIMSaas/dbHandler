@@ -35,9 +35,13 @@ docker: build
 run:
 	docker-compose up -d
 
-cloud: docker
+gcp: docker
 	docker tag drjimdb australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb
 	docker push australia-southeast2-docker.pkg.dev/drjim-f2087/drjimrepo/drjimdb	
+
+aws: docker
+	docker tag drjimdb:latest 600073216458.dkr.ecr.ap-southeast-2.amazonaws.com/jimrepo:latest
+	docker push 600073216458.dkr.ecr.ap-southeast-2.amazonaws.com/jimrepo:latest	
 
 .PHONY: all clean it fmt tidy build test vet lint cover
 
