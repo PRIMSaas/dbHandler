@@ -1,0 +1,92 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "The template used to create an ECS Service from the ECS Console.",
+    "Parameters": {
+      "ECSClusterName": {
+        "Type": "String",
+        "Default": "drjim"
+      },
+      "ECSServiceName": {
+        "Type": "String",
+        "Default": "drjimService"
+      },
+      "SecurityGroupIDs": {
+        "Type": "CommaDelimitedList",
+        "Default": "sg-9e03bedf"
+      },
+      "SubnetIDs": {
+        "Type": "CommaDelimitedList",
+        "Default": "subnet-94f62ef2,subnet-aa9045e2,subnet-f6abe0ae"
+      },
+      "VpcID": {
+        "Type": "String",
+        "Default": "vpc-64c83802"
+      },
+      "LoadBalancerName": {
+        "Type": "String",
+        "Default": ""
+      }
+    },
+    "Resources": {
+      "ECSService": {
+        "Type": "AWS::ECS::Service",
+        "Properties": {
+          "Cluster": "drjim",
+          "CapacityProviderStrategy": [
+            {
+              "CapacityProvider": "FARGATE",
+              "Base": 0,
+              "Weight": 1
+            }
+          ],
+          "TaskDefinition": "arn:aws:ecs:ap-southeast-2:600073216458:task-definition/drjimdbTask:32",
+          "ServiceName": "drjimService",
+          "SchedulingStrategy": "REPLICA",
+          "DesiredCount": 1,
+          "AvailabilityZoneRebalancing": "ENABLED",
+          "NetworkConfiguration": {
+            "AwsvpcConfiguration": {
+              "AssignPublicIp": "ENABLED",
+              "SecurityGroups": {
+                "Ref": "SecurityGroupIDs"
+              },
+              "Subnets": {
+                "Ref": "SubnetIDs"
+              }
+            }
+          },
+          "PlatformVersion": "LATEST",
+          "DeploymentConfiguration": {
+            "MaximumPercent": 200,
+            "MinimumHealthyPercent": 100,
+            "DeploymentCircuitBreaker": {
+              "Enable": true,
+              "Rollback": true
+            }
+          },
+          "DeploymentController": {
+            "Type": "ECS"
+          },
+          "ServiceConnectConfiguration": {
+            "Enabled": false
+          },
+          "Tags": [],
+          "EnableECSManagedTags": true
+        }
+      }
+    },
+    "Outputs": {
+      "ClusterName": {
+        "Description": "The cluster used to create the service.",
+        "Value": {
+          "Ref": "ECSClusterName"
+        }
+      },
+      "ECSService": {
+        "Description": "The created service.",
+        "Value": {
+          "Ref": "ECSService"
+        }
+      }
+    }
+  }
