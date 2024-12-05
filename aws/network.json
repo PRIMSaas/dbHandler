@@ -1,0 +1,63 @@
+{
+    "NetworkInterfaces": [
+        {
+            "Association": {
+                "IpOwnerId": "amazon",
+                "PublicDnsName": "ec2-3-27-224-4.ap-southeast-2.compute.amazonaws.com",
+                "PublicIp": "3.27.224.4"
+            },
+            "Attachment": {
+                "AttachTime": "2024-11-19T23:05:33+00:00",
+                "AttachmentId": "eni-attach-0af94fe4872b6ed8f",
+                "DeleteOnTermination": false,
+                "DeviceIndex": 1,
+                "NetworkCardIndex": 0,
+                "InstanceOwnerId": "334373625147",
+                "Status": "attached"
+            },
+            "AvailabilityZone": "ap-southeast-2a",
+            "Description": "arn:aws:ecs:ap-southeast-2:600073216458:attachment/3ca47df9-60c1-4602-ad6a-63e1cce6d920",
+            "Groups": [
+                {
+                    "GroupId": "sg-9e03bedf",
+                    "GroupName": "default"
+                }
+            ],
+            "InterfaceType": "interface",
+            "Ipv6Addresses": [],
+            "MacAddress": "06:a0:e4:92:ae:49",
+            "NetworkInterfaceId": "eni-052dfe2f3ae464c32",
+            "OwnerId": "600073216458",
+            "PrivateDnsName": "ip-172-31-45-242.ap-southeast-2.compute.internal",
+            "PrivateIpAddress": "172.31.45.242",
+            "PrivateIpAddresses": [
+                {
+                    "Association": {
+                        "IpOwnerId": "amazon",
+                        "PublicDnsName": "ec2-3-27-224-4.ap-southeast-2.compute.amazonaws.com",
+                        "PublicIp": "3.27.224.4"
+                    },
+                    "Primary": true,
+                    "PrivateDnsName": "ip-172-31-45-242.ap-southeast-2.compute.internal",
+                    "PrivateIpAddress": "172.31.45.242"
+                }
+            ],
+            "RequesterId": "578734482556",
+            "RequesterManaged": true,
+            "SourceDestCheck": true,
+            "Status": "in-use",
+            "SubnetId": "subnet-aa9045e2",
+            "TagSet": [
+                {
+                    "Key": "aws:ecs:serviceName",
+                    "Value": "drjimService"
+                },
+                {
+                    "Key": "aws:ecs:clusterName",
+                    "Value": "drjim"
+                }
+            ],
+            "VpcId": "vpc-64c83802"
+        }
+    ]
+}

@@ -52,7 +52,7 @@ func runHttpApi(port int) {
 		AllowedHeaders:   []string{"Authorization", "Content-Type"},
 		AllowedOrigins:   []string{"http://127.0.0.1:5055", "*"},
 		AllowCredentials: true,
-		AllowedMethods:   []string{"POST", "OPTIONS"},
+		AllowedMethods:   []string{"POST", "OPTIONS", "GET"},
 		MaxAge:           7200,
 	}
 	if properties.Debug {
@@ -64,6 +64,10 @@ func runHttpApi(port int) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/processFile", processFile)
 	mux.HandleFunc("/profile", pprof.Profile)
+	mux.HandleFunc("/health",
+		func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		})
 	handler := c.Handler(mux)
 
 	err := http.ListenAndServe(httpAddress, handler)

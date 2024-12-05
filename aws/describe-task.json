@@ -1,0 +1,122 @@
+{
+    "tasks": [
+        {
+            "attachments": [
+                {
+                    "id": "3ca47df9-60c1-4602-ad6a-63e1cce6d920",
+                    "type": "ElasticNetworkInterface",
+                    "status": "ATTACHED",
+                    "details": [
+                        {
+                            "name": "subnetId",
+                            "value": "subnet-aa9045e2"
+                        },
+                        {
+                            "name": "networkInterfaceId",
+                            "value": "eni-052dfe2f3ae464c32"
+                        },
+                        {
+                            "name": "macAddress",
+                            "value": "06:a0:e4:92:ae:49"
+                        },
+                        {
+                            "name": "privateDnsName",
+                            "value": "ip-172-31-45-242.ap-southeast-2.compute.internal"
+                        },
+                        {
+                            "name": "privateIPv4Address",
+                            "value": "172.31.45.242"
+                        }
+                    ]
+                }
+            ],
+            "attributes": [
+                {
+                    "name": "ecs.cpu-architecture",
+                    "value": "x86_64"
+                }
+            ],
+            "availabilityZone": "ap-southeast-2a",
+            "capacityProviderName": "FARGATE",
+            "clusterArn": "arn:aws:ecs:ap-southeast-2:600073216458:cluster/drjim",
+            "connectivity": "CONNECTED",
+            "connectivityAt": "2024-11-20T10:05:33.688000+11:00",
+            "containers": [
+                {
+                    "containerArn": "arn:aws:ecs:ap-southeast-2:600073216458:container/drjim/466b9d3fc0674d8792a6eef2d43f402c/10b93ea9-7222-44b8-8679-950af51e0c17",
+                    "taskArn": "arn:aws:ecs:ap-southeast-2:600073216458:task/drjim/466b9d3fc0674d8792a6eef2d43f402c",
+                    "name": "drjimdbContainer",
+                    "image": "600073216458.dkr.ecr.ap-southeast-2.amazonaws.com/jimrepo:latest",
+                    "imageDigest": "sha256:ff96c9927aaa00932a1163404a0b876a555058bcef66f3b3b7ffedd2d4cd106c",
+                    "runtimeId": "466b9d3fc0674d8792a6eef2d43f402c-0830165842",
+                    "lastStatus": "RUNNING",
+                    "networkBindings": [],
+                    "networkInterfaces": [
+                        {
+                            "attachmentId": "3ca47df9-60c1-4602-ad6a-63e1cce6d920",
+                            "privateIpv4Address": "172.31.45.242"
+                        }
+                    ],
+                    "healthStatus": "UNKNOWN",
+                    "cpu": "0"
+                },
+                {
+                    "containerArn": "arn:aws:ecs:ap-southeast-2:600073216458:container/drjim/466b9d3fc0674d8792a6eef2d43f402c/b98bde2f-7e7e-4f31-864c-5e5ff6aac525",
+                    "taskArn": "arn:aws:ecs:ap-southeast-2:600073216458:task/drjim/466b9d3fc0674d8792a6eef2d43f402c",
+                    "name": "fetch-at-startup",
+                    "image": "amazon/aws-cli:2.4.6",
+                    "imageDigest": "sha256:d123012561ce8a323782d891d79ef81791f49f964692e42b4e00e89d2c5669a3",
+                    "runtimeId": "466b9d3fc0674d8792a6eef2d43f402c-3915624907",
+                    "lastStatus": "STOPPED",
+                    "exitCode": 0,
+                    "networkBindings": [],
+                    "networkInterfaces": [
+                        {
+                            "attachmentId": "3ca47df9-60c1-4602-ad6a-63e1cce6d920",
+                            "privateIpv4Address": "172.31.45.242"
+                        }
+                    ],
+                    "healthStatus": "UNKNOWN",
+                    "cpu": "0"
+                }
+            ],
+            "cpu": "1024",
+            "createdAt": "2024-11-20T10:05:29.587000+11:00",
+            "desiredStatus": "RUNNING",
+            "enableExecuteCommand": false,
+            "group": "service:drjimService",
+            "healthStatus": "UNKNOWN",
+            "lastStatus": "RUNNING",
+            "launchType": "FARGATE",
+            "memory": "2048",
+            "overrides": {
+                "containerOverrides": [
+                    {
+                        "name": "fetch-at-startup"
+                    },
+                    {
+                        "name": "drjimdbContainer"
+                    }
+                ],
+                "inferenceAcceleratorOverrides": []
+            },
+            "platformVersion": "1.4.0",
+            "platformFamily": "Linux",
+            "pullStartedAt": "2024-11-20T10:05:40.609000+11:00",
+            "pullStoppedAt": "2024-11-20T10:05:55.298000+11:00",
+            "startedAt": "2024-11-20T10:05:58.817000+11:00",
+            "startedBy": "ecs-svc/1524751384411278669",
+            "tags": [],
+            "taskArn": "arn:aws:ecs:ap-southeast-2:600073216458:task/drjim/466b9d3fc0674d8792a6eef2d43f402c",
+            "taskDefinitionArn": "arn:aws:ecs:ap-southeast-2:600073216458:task-definition/drjimdbTask:31",
+            "version": 4,
+            "ephemeralStorage": {
+                "sizeInGiB": 20
+            },
+            "fargateEphemeralStorage": {
+                "sizeInGiB": 20
+            }
+        }
+    ],
+    "failures": []
+}
