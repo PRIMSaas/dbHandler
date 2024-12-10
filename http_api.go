@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	mailjet "github.com/mailjet/mailjet-apiv3-go/v4"
 	"github.com/rs/cors"
 	"io"
 	"net/http"
@@ -45,6 +46,41 @@ func processFile(writer http.ResponseWriter, request *http.Request) {
 	logInfo.Printf("Processing file took: %v", duration)
 }
 
+func processMail(writer http.ResponseWriter, request *http.Request) {
+	start := time.Now()
+
+	body, err := io.ReadAll(request.Body)
+	if err != nil {
+		errs := fmt.Sprintf("Error reading mail request body: %v", err)
+		http.Error(writer, errs, http.StatusInternalServerError)
+		return
+	}
+	file := []mailjet.InfoMessagesV31{}
+	err = json.Unmarshal(body, &file)
+	if err != nil {
+		errs := fmt.Sprintf("Error parsing mail json body: %v", err)
+		http.Error(writer, errs, http.StatusBadRequest)
+		return
+	}
+	resp, err := sendMail(file)
+	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err != nil {
+		errStr := fmt.Sprintf("Error sending mail: %v", err)
+		http.Error(writer, errStr, http.StatusUnprocessableEntity)
+		return
+	}
+	// On success, set the Content-Type header to application/json
+	writer.Header().Set("Content-Type", "application/json")
+	err = json.NewEncoder(writer).Encode(resp)
+	if err != nil {
+		errStr := fmt.Sprintf("Error encoding mail response body: %v", err)
+		http.Error(writer, errStr, http.StatusInternalServerError)
+		return
+	}
+	duration := time.Since(start)
+	logInfo.Printf("Send mail took: %v", duration)
+}
+
 func runHttpApi(port int) {
 	httpAddress := fmt.Sprintf("0.0.0.0:%d", port)
 
@@ -63,6 +99,7 @@ func runHttpApi(port int) {
 	logInfo.Printf("Starting HTTP server: %s", httpAddress)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/processFile", processFile)
+	mux.HandleFunc("/mail", processMail)
 	mux.HandleFunc("/profile", pprof.Profile)
 	mux.HandleFunc("/health",
 		func(w http.ResponseWriter, r *http.Request) {

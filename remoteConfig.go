@@ -16,6 +16,9 @@ const BASE_URL = "https://firebaseremoteconfig.googleapis.com"
 const REMOTE_CONFIG_ENDPOINT = "/v1/projects/" + PROJECT_ID + "/remoteConfig"
 const REMOTE_CONFIG_URL = BASE_URL + REMOTE_CONFIG_ENDPOINT
 
+const MAIL_PUBLIC_KEY = "mailPublicKey"
+const MAIL_PRIVATE_KEY = "mailPrivateKey"
+
 /* type RemoteConfig struct {
 	Parameters map[string]Parameter `json:"parameters"`
 	Etag       string               `json:"etag"`
@@ -123,6 +126,22 @@ func getAccessToken(credentialFile string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	mail := struct {
+		MailPublicKey  string `json:"mjml_api_key_public"`
+		MailPrivateKey string `json:"mjml_api_key_private"`
+	}{}
+
+	err = json.Unmarshal(data, &mail)
+	if err != nil {
+		logError.Printf("Failed to parse mail credentials: %v", err)
+	}
+	//
+	// Be careful, there are already values in configVals
+	// so don't marschal directly into the map
+	//
+	configVals[MAIL_PUBLIC_KEY] = mail.MailPublicKey
+	configVals[MAIL_PRIVATE_KEY] = mail.MailPrivateKey
 
 	conf, err := google.JWTConfigFromJSON(data, REMOTE_CONFIG_AUTH_URL)
 	if err != nil {
