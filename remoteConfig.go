@@ -44,6 +44,8 @@ type Properties struct {
 var properties Properties
 
 var configVals = map[string]string{} // local config
+var secretVals = map[string]string{} // local config
+
 // remote config
 var params map[string]firebaseremoteconfig.RemoteConfigParameter = make(map[string]firebaseremoteconfig.RemoteConfigParameter)
 
@@ -110,6 +112,11 @@ func getConfig(key string, defaultVal string) string {
 		logInfo.Printf("Found local config %v: %v", key, val)
 		return val
 	}
+	// no logging please, they are supposed to be secret
+	val, ok = secretVals[key]
+	if ok {
+		return val
+	}
 
 	logError.Printf("%v key not found in local config parameters", key)
 	remoteVal, ok := params[key]
@@ -140,8 +147,8 @@ func getAccessToken(credentialFile string) (string, error) {
 	// Be careful, there are already values in configVals
 	// so don't marschal directly into the map
 	//
-	configVals[MAIL_PUBLIC_KEY] = mail.MailPublicKey
-	configVals[MAIL_PRIVATE_KEY] = mail.MailPrivateKey
+	secretVals[MAIL_PUBLIC_KEY] = mail.MailPublicKey
+	secretVals[MAIL_PRIVATE_KEY] = mail.MailPrivateKey
 
 	conf, err := google.JWTConfigFromJSON(data, REMOTE_CONFIG_AUTH_URL)
 	if err != nil {
