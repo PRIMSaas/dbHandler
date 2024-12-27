@@ -69,14 +69,6 @@ func initStart(key string, config string) {
 	if fileExists(config, "config") && fileExists(key, "keyfile") {
 		initConfig(key, config)
 	}
-	//
-	// Are we running local against emulators?
-	//
-	//env := getConfig("env", "local")
-	//if env == "local" {
-	//	os.Setenv("FIRESTORE_EMULATOR_HOST", "localhost:8080")
-	//	logInfo.Println("Using Firestore emulator")
-	//}
 }
 
 func initClient(ctx context.Context, keys string) *firestore.Client {
