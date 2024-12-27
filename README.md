@@ -59,6 +59,13 @@ curl -i -d '{"fileContent":"Vermont Medical Clinic,Dr Fiona Chao,Irrelevant,Pati
 docker-compose up -d<br>
 docker run --entrypoint /bin/bash -it drjimdb <br>
 
+## Mailjet
+Test: <br>
+curl -H "Authorization: Basic OTFjYjUxM2UxMGU3OTdlNjE1NDJjN2Y1OTI4MjFmNWI6MWUwYTdkNzIzYjkzZWYwODAwYzk2YzgxZjUxNzBiNWQ=" -d '{"Messages":[{"From":{"Email":"sender@example.com","Name":"Me"},"To":[{"Email":"jimbotech007@gmail.com","Name":"You"}],"Subject":"My first Mailjet Email!","TextPart":"Greetings from Mailjet!","HTMLPart":"<h3>Dear passenger 1, welcome to <a href=\"https://www.mailjet.com/\">Mailjet!</a></h3><br />May the delivery force be with you!"}]}' -X POST https://api.mailjet.com/v3.1/send <br><br>
+
+Test code:<br>
+curl -i -d '[{"From":{"Email":"sender@example.com","Name":"Me"},"To":[{"Email":"jimbotech007@gmail.com","Name":"You"}],"Subject":"My first Mailjet Email!","TextPart":"Greetings from Mailjet!","HTMLPart":"<h3>Dear passenger 1, welcome to <a href=\"https://www.mailjet.com/\">Mailjet!</a></h3><br />May the delivery force be with you!"}]' -X POST http//27.0.0.1:8088/mail<br>
+
 ## Calculations to be performed
 The input file is layed out like this:<br>
 Location 0 A, Provider 1 B, Billed To 2 C, Patient Name 3 D, Invoice No. 4 E, Service ID 5 F, Payment ID 6 G, Item No. 7 H, Description 8 I, Status 9 J, Transaction Date 10 k, Payment Method 11 L, Account Type 12 M, "GST( incl GST)" 13 N, "Payment( incl GST)" 14 O, "Deposit($ incl GST)" 15 P<br>

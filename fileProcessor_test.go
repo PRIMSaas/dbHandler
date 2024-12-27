@@ -57,7 +57,7 @@ func TestCalcErrorItemMappingServiceCode(t *testing.T) {
 	configureLogging()
 	goodCode := "code1"
 	dr1 := "A Practice [no bulk-billing],Dr Aha,Irrelevant,Sick Patient,162307,174545,71756,80010,\"Clinical psychologist consultation, >50 min, consulting rooms\",Reversed payment,01/03/2024,EFT,Private,0.00,(224.50),0.00"
-	
+
 	drName := "Dr Aha"
 	paymentFile := PaymentFile{
 		FileContent:    dr1, // + "\n" + dr2,
