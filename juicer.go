@@ -2,7 +2,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
+	"errors"
 	"fmt"
+	"image"
+	"strings"
 	"time"
 
 	"github.com/jung-kurt/gofpdf"
@@ -28,8 +32,34 @@ var (
 )
 var blankCell = TableText{}
 
-func makePdf(reportPeriod string, companyName string, provider string, details PaymentTotals, adjustments []Adjustments,
-	companyDetails Address, providerAddr Address) ([]byte, error) {
+func decodeBase64Image(base64Image string) ([]byte, string, error) {
+	// Strip the data URL scheme prefix
+	if strings.HasPrefix(base64Image, "data:image/") {
+		parts := strings.SplitN(base64Image, ",", 2)
+		if len(parts) == 2 {
+			base64Image = parts[1]
+		} else {
+			return nil, "", errors.New("invalid base64 image data")
+		}
+	}
+
+	// Decode the base64 string
+	imageData, err := base64.StdEncoding.DecodeString(base64Image)
+	if err != nil {
+		return nil, "", errors.New("failed to decode base64 image data")
+	}
+
+	// Determine the image type
+	_, format, err := image.DecodeConfig(bytes.NewReader(imageData))
+	if err != nil {
+		return nil, "", errors.New("failed to determine image format")
+	}
+	return imageData, format, nil
+}
+
+func makePdf(reportPeriod string, companyName string, provider string, details PaymentTotals,
+	adjustments []Adjustments, companyDetails Address, providerAddr Address,
+	imageData []byte, logoType string) ([]byte, error) {
 	pdf := gofpdf.New("P", "mm", "A4", "")
 	pdf.AddPage()
 	pdf.SetMargins(10, 10, 30)
@@ -37,7 +67,11 @@ func makePdf(reportPeriod string, companyName string, provider string, details P
 	pdf.SetTitle("TAX INVOICE", false)
 	pdf.SetFont("Arial", "B", 16)
 	pdf.Text(10, 20, "TAX INVOICE")
-	pdf.ImageOptions("logo.jpg", 150, 20, 35, 35, false, gofpdf.ImageOptions{ImageType: "JPEG", ReadDpi: true}, 0, "")
+	if len(imageData) > 0 && strings.TrimSpace(logoType) != "" {
+		imageReader := bytes.NewReader(imageData)
+		pdf.RegisterImageOptionsReader("logo", gofpdf.ImageOptions{ImageType: logoType}, imageReader)
+		pdf.ImageOptions("logo", 150, 20, 35, 35, false, gofpdf.ImageOptions{ImageType: logoType, ReadDpi: true}, 0, "")
+	}
 	pdf.SetXY(10, 29)
 	addAddress(pdf, companyName, companyDetails)
 	pdf.Ln(10)

@@ -19,30 +19,8 @@ type Address struct {
 	City          string `json:"city"`
 	ABN           string `json:"abn"`
 	Email         string `json:"email"`
+	Logo          string `json:"logo"`
 }
-
-/*
-json payload
-
-	{
-	    "FileContent": "your_file_content",
-	    "CsvLineStart": 16,
-	    "CompanyDetails": Address{...},
-	    "CodeMap": [
-	        {
-	            "code1": ["123", "456"]
-	        },
-	        {
-	            "code2": ["789", "012"]
-	        }
-	    ],
-	    "PracMap":
-	      {
-	        "Doctor1": {"code1":"50", "code2":"20"},
-	        "DOctor2": {"code1":"40", "code2":"30"}
-	      }
-	}
-*/
 type PaymentFile struct {
 	FileContent    string                       `json:"fileContent"`
 	CsvLineStart   int                          `json:"csvLineStart"`
@@ -279,7 +257,13 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 	// Create PDFs, but only if that provider had no errors
 	// If there are adjustments for that provider, add them to the PDF
 	//
+	imageData := []byte{}
+	logoType := ""
+	var convError error = nil
 	gotAtLeastOneInvoice := false
+	if content.CompanyDetails.Logo == "" {
+		logError.Printf("No logo provided for %v", content.CompanyDetails.Name)
+	}
 	for provider, details := range providerTotalsMap {
 		if _, exists := providerWithErrors[provider]; !exists {
 			if content.AdjustMap[provider] != nil {
@@ -288,8 +272,14 @@ func processFileContent(content PaymentFile) (FileProcessingResponse, error) {
 					details.AdjustmentTotal += adj.Amount
 				}
 			}
+			if content.CompanyDetails.Logo != "" && len(imageData) == 0 && convError == nil {
+				imageData, logoType, convError = decodeBase64Image(content.CompanyDetails.Logo)
+				if convError != nil {
+					logError.Printf("Logo conversion failed: %v", convError)
+				}
+			}
 			pdfBytes, err := makePdf(reportPeriod, companyName, provider, details, content.AdjustMap[provider],
-				content.CompanyDetails, content.PracDetails[provider])
+				content.CompanyDetails, content.PracDetails[provider], imageData, logoType)
 
 			if err != nil {
 				logError.Printf("Error creating PDF for provider: %v. Cause: %v", provider, err)
