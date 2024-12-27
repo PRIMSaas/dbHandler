@@ -6,7 +6,6 @@ require (
 	cloud.google.com/go/firestore v1.14.0
 	firebase.google.com/go v3.13.0+incompatible
 	github.com/jung-kurt/gofpdf v1.16.2
-	github.com/mailjet/mailjet-apiv3-go/v4 v4.0.7
 	github.com/rs/cors v1.11.0
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/oauth2 v0.18.0

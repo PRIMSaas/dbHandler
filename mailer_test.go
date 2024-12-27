@@ -5,25 +5,75 @@ import (
 
 	"math/rand"
 
+	// mailjet "github.com/mailjet/mailjet-apiv3-go/v4"
 	"github.com/stretchr/testify/require"
-
-	mailjet "github.com/mailjet/mailjet-apiv3-go/v4"
 )
 
-func TestRegisterSender(t *testing.T) {
-	// Setup
+var sender = MailAddress{
+	Name:  "Jimbotron",
+	Email: "test1" + "@example.com",
+}
+
+func TestGetSenders(t *testing.T) {
 	intiTest()
 
-	rstr := randSeq(10)
-	sender := mailjet.RecipientV31{
-		Name:  "Jimbotron",
-		Email: rstr + "@mailjet.com",
-	}
-
-	// Execute
-	res, err := registerSender(sender)
+	res, err := getSenders()
 	require.NoError(t, err)
 	require.NotNil(t, res)
+	require.NotEmpty(t, res)
+}
+
+// Needs to be tested against a known active email address
+func SkipTestSenderActive(t *testing.T) {
+	intiTest()
+
+	sender.Email = "jimbotech007@gmail.com"
+	active, exists, err := senderActive(sender)
+	require.NoError(t, err)
+	require.True(t, active)
+	require.True(t, exists)
+}
+func TestSendNotActive(t *testing.T) {
+	intiTest()
+
+	sender.Email = "madeup@gmail.com"
+	active, exists, err := senderActive(sender)
+	require.NoError(t, err)
+	require.False(t, active)
+	require.False(t, exists)
+}
+
+// Can run this test manually, but running it repeatedly will just store
+// a lot of addresses against that account
+func SkipTestRegisterOrValidateThenDeleteSender(t *testing.T) {
+	intiTest()
+	rstr := randSeq(10)
+	sender.Email = rstr + "@example.com"
+	// Execute
+	err := registerOrValidateSender(sender)
+	require.NoError(t, err)
+
+	res, err := getSenders()
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.NotEmpty(t, res)
+	_, ok := res[sender.Email]
+	require.True(t, ok)
+
+	/*	Can't really delete or the address can never be used again
+		without being validated, which it never will be because it's a test address
+		This is only useful for manual testing */
+	/*
+		err = deleteSender(sender)
+		require.NoError(t, err)
+
+		res, err = getSenders()
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.NotEmpty(t, res)
+		_, ok = res[sender.Email]
+		require.False(t, ok)
+	*/
 }
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -36,3 +86,19 @@ func randSeq(n int) string {
 	}
 	return string(b)
 }
+
+/* func TestRegisterSender(t *testing.T) {
+	// Setup
+	intiTest()
+
+	rstr := randSeq(10)
+	sender := mailjet.RecipientV31{
+		Name:  "Jimbotron",
+		Email: rstr + "@mailjet.com",
+	}
+
+	// Execute
+	res, err := registerJetSender(sender)
+	require.NoError(t, err)
+	require.NotNil(t, res)
+} */
