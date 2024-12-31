@@ -179,24 +179,26 @@ func senderActive(mad MailAddress) (bool, bool, error) {
 	return true, true, nil
 }
 
-func registerOrValidateSender(mad MailAddress) error {
+func registerOrValidateSender(mad MailAddress) (bool, error) {
 	active, exists, err := senderActive(mad)
 	if err != nil {
-		return fmt.Errorf("failed to get senders: %v", err)
+		return false, fmt.Errorf("failed to get senders: %v", err)
 	}
 	if !exists {
 		err = registerSender(mad)
 		if err != nil {
-			return fmt.Errorf("failed to register sender: %v", err)
+			return false, fmt.Errorf("failed to register sender: %v", err)
 		}
+		return false, nil
 	}
 	if !active {
 		err = validateSender(mad)
 		if err != nil {
-			return fmt.Errorf("failed to validate sender: %v", err)
+			return false, fmt.Errorf("failed to validate sender: %v", err)
 		}
+		return false, nil
 	}
-	return nil
+	return true, nil
 }
 
 func registerSender(mad MailAddress) error {
@@ -240,21 +242,6 @@ func validateSender(mad MailAddress) error {
 			status, string(body))
 	}
 	logInfo.Printf("Sender %v validate: %v\n", mad.Name, mad.Email)
-	return nil
-}
-
-func deleteSender(mad MailAddress) error {
-	url := fmt.Sprintf("sender/%s", url.QueryEscape(mad.Email))
-	status, body, err := sendHttp([]byte{}, url, DELETE)
-	if err != nil {
-		return fmt.Errorf("failed to delete sender: %v", err)
-	}
-	// Check if the response status code is a 2xx value
-	if status < http.StatusOK || status >= 300 {
-		return fmt.Errorf("failed to delete sender: received status code %d with message %v",
-			status, string(body))
-	}
-	logInfo.Printf("Sender %v deleted: %v\n", mad.Name, mad.Email)
 	return nil
 }
 
