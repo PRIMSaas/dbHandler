@@ -57,14 +57,12 @@ type Attachment struct {
 type MultiAttachment []Attachment
 
 type MailMsg struct {
-	From   *MailAddress      `json:",omitempty"`
-	Sender *MailAddress      `json:",omitempty"`
-	To     *MultiMailAddress `json:",omitempty"`
-	//	Cc                       *MultiMailAddress       `json:",omitempty"`
-	Attachments *MultiAttachment `json:",omitempty"`
-	Subject     string           `json:",omitempty"`
-	TextPart    string           `json:",omitempty"`
-	HTMLPart    string           `json:",omitempty"`
+	From        MailAddress
+	To          MultiMailAddress
+	Attachments MultiAttachment
+	Subject     string
+	TextPart    string
+	HTMLPart    string `json:",omitempty"`
 }
 
 type SendMailMsg struct {
@@ -88,19 +86,19 @@ type MailResult struct {
 
 func processSendingMail(messages []MailMsg) error {
 	for _, msg := range messages {
-		details, ok, err := findSender(*msg.Sender)
+		details, ok, err := findSender(msg.To[1])
 		if err != nil {
 			return fmt.Errorf("failed to get senders: %v", err)
 		}
 		if !ok || details.Status != "Active" {
-			logError.Printf("Sender %v not found or not active. Mail NOT sent", msg.Sender.Email)
+			logError.Printf("Sender %v not found or not active. Mail NOT sent", msg.To[1].Email)
 		}
 
 		err = sendMail(msg)
 		if err != nil {
 			return fmt.Errorf("failed to send mail: %v", err)
 		}
-		logInfo.Printf("Mail sent to %v from %v", msg.To, msg.Sender)
+		logInfo.Printf("Mail sent to %v from %v", msg.To, msg.To[1])
 	}
 	return nil
 }

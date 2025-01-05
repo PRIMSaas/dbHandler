@@ -155,9 +155,9 @@ func runHttpApi(port int) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/processFile", processFile)
 
-	mux.HandleFunc("/register", registerNewSender)
-	mux.HandleFunc("/active", checkSenderActive)
-	mux.HandleFunc("/mail", processMail)
+	//mux.HandleFunc("/register", registerNewSender)
+	//mux.HandleFunc("/active", checkSenderActive)
+	//mux.HandleFunc("/mail", processMail)
 	mux.HandleFunc("/profile", pprof.Profile)
 	mux.HandleFunc("/health",
 		func(w http.ResponseWriter, r *http.Request) {
