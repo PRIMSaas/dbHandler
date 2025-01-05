@@ -46,6 +46,7 @@ func processFile(writer http.ResponseWriter, request *http.Request) {
 	logInfo.Printf("Processing file took: %v", duration)
 }
 
+// Returns 200 for successfully sent validation and 202 for already ACTIVE
 func registerNewSender(writer http.ResponseWriter, request *http.Request) {
 	start := time.Now()
 
@@ -62,43 +63,20 @@ func registerNewSender(writer http.ResponseWriter, request *http.Request) {
 		http.Error(writer, errs, http.StatusBadRequest)
 		return
 	}
-	err = registerOrValidateSender(mad)
+	active, err := registerOrValidateSender(mad)
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err != nil {
 		errStr := fmt.Sprintf("Error registerNewSender: %v", err)
 		http.Error(writer, errStr, http.StatusServiceUnavailable)
 		return
 	}
+	if active {
+		writer.WriteHeader(http.StatusAccepted)
+	}
 	duration := time.Since(start)
 	logInfo.Printf("registerNewSender file took: %v", duration)
 }
 
-func deleteOldSender(writer http.ResponseWriter, request *http.Request) {
-	start := time.Now()
-
-	body, err := io.ReadAll(request.Body)
-	if err != nil {
-		errs := fmt.Sprintf("Error reading request body: %v", err)
-		http.Error(writer, errs, http.StatusInternalServerError)
-		return
-	}
-	mad := MailAddress{}
-	err = json.Unmarshal(body, &mad)
-	if err != nil {
-		errs := fmt.Sprintf("Error parsing json body: %v", err)
-		http.Error(writer, errs, http.StatusBadRequest)
-		return
-	}
-	err = deleteSender(mad)
-	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err != nil {
-		errStr := fmt.Sprintf("Error deleteOldSender: %v", err)
-		http.Error(writer, errStr, http.StatusServiceUnavailable)
-		return
-	}
-	duration := time.Since(start)
-	logInfo.Printf("deleteOldSender file took: %v", duration)
-}
 func checkSenderActive(writer http.ResponseWriter, request *http.Request) {
 	start := time.Now()
 	body, err := io.ReadAll(request.Body)
@@ -177,10 +155,9 @@ func runHttpApi(port int) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/processFile", processFile)
 
-	mux.HandleFunc("/register", registerNewSender)
-	mux.HandleFunc("/delete", deleteOldSender)
-	mux.HandleFunc("/active", checkSenderActive)
-	mux.HandleFunc("/mail", processMail)
+	//mux.HandleFunc("/register", registerNewSender)
+	//mux.HandleFunc("/active", checkSenderActive)
+	//mux.HandleFunc("/mail", processMail)
 	mux.HandleFunc("/profile", pprof.Profile)
 	mux.HandleFunc("/health",
 		func(w http.ResponseWriter, r *http.Request) {

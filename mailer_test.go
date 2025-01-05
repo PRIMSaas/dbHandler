@@ -50,7 +50,7 @@ func SkipTestRegisterOrValidateThenDeleteSender(t *testing.T) {
 	rstr := randSeq(10)
 	sender.Email = rstr + "@example.com"
 	// Execute
-	err := registerOrValidateSender(sender)
+	_, err := registerOrValidateSender(sender)
 	require.NoError(t, err)
 
 	res, err := getSenders()
@@ -59,21 +59,6 @@ func SkipTestRegisterOrValidateThenDeleteSender(t *testing.T) {
 	require.NotEmpty(t, res)
 	_, ok := res[sender.Email]
 	require.True(t, ok)
-
-	/*	Can't really delete or the address can never be used again
-		without being validated, which it never will be because it's a test address
-		This is only useful for manual testing */
-	/*
-		err = deleteSender(sender)
-		require.NoError(t, err)
-
-		res, err = getSenders()
-		require.NoError(t, err)
-		require.NotNil(t, res)
-		require.NotEmpty(t, res)
-		_, ok = res[sender.Email]
-		require.False(t, ok)
-	*/
 }
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")

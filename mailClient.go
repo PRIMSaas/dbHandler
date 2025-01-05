@@ -57,14 +57,12 @@ type Attachment struct {
 type MultiAttachment []Attachment
 
 type MailMsg struct {
-	From   *MailAddress      `json:",omitempty"`
-	Sender *MailAddress      `json:",omitempty"`
-	To     *MultiMailAddress `json:",omitempty"`
-	//	Cc                       *MultiMailAddress       `json:",omitempty"`
-	Attachments *MultiAttachment `json:",omitempty"`
-	Subject     string           `json:",omitempty"`
-	TextPart    string           `json:",omitempty"`
-	HTMLPart    string           `json:",omitempty"`
+	From        MailAddress
+	To          MultiMailAddress
+	Attachments MultiAttachment
+	Subject     string
+	TextPart    string
+	HTMLPart    string `json:",omitempty"`
 }
 
 type SendMailMsg struct {
@@ -88,19 +86,19 @@ type MailResult struct {
 
 func processSendingMail(messages []MailMsg) error {
 	for _, msg := range messages {
-		details, ok, err := findSender(*msg.Sender)
+		details, ok, err := findSender(msg.To[1])
 		if err != nil {
 			return fmt.Errorf("failed to get senders: %v", err)
 		}
 		if !ok || details.Status != "Active" {
-			logError.Printf("Sender %v not found or not active. Mail NOT sent", msg.Sender.Email)
+			logError.Printf("Sender %v not found or not active. Mail NOT sent", msg.To[1].Email)
 		}
 
 		err = sendMail(msg)
 		if err != nil {
 			return fmt.Errorf("failed to send mail: %v", err)
 		}
-		logInfo.Printf("Mail sent to %v from %v", msg.To, msg.Sender)
+		logInfo.Printf("Mail sent to %v from %v", msg.To, msg.To[1])
 	}
 	return nil
 }
@@ -179,24 +177,26 @@ func senderActive(mad MailAddress) (bool, bool, error) {
 	return true, true, nil
 }
 
-func registerOrValidateSender(mad MailAddress) error {
+func registerOrValidateSender(mad MailAddress) (bool, error) {
 	active, exists, err := senderActive(mad)
 	if err != nil {
-		return fmt.Errorf("failed to get senders: %v", err)
+		return false, fmt.Errorf("failed to get senders: %v", err)
 	}
 	if !exists {
 		err = registerSender(mad)
 		if err != nil {
-			return fmt.Errorf("failed to register sender: %v", err)
+			return false, fmt.Errorf("failed to register sender: %v", err)
 		}
+		return false, nil
 	}
 	if !active {
 		err = validateSender(mad)
 		if err != nil {
-			return fmt.Errorf("failed to validate sender: %v", err)
+			return false, fmt.Errorf("failed to validate sender: %v", err)
 		}
+		return false, nil
 	}
-	return nil
+	return true, nil
 }
 
 func registerSender(mad MailAddress) error {
@@ -240,21 +240,6 @@ func validateSender(mad MailAddress) error {
 			status, string(body))
 	}
 	logInfo.Printf("Sender %v validate: %v\n", mad.Name, mad.Email)
-	return nil
-}
-
-func deleteSender(mad MailAddress) error {
-	url := fmt.Sprintf("sender/%s", url.QueryEscape(mad.Email))
-	status, body, err := sendHttp([]byte{}, url, DELETE)
-	if err != nil {
-		return fmt.Errorf("failed to delete sender: %v", err)
-	}
-	// Check if the response status code is a 2xx value
-	if status < http.StatusOK || status >= 300 {
-		return fmt.Errorf("failed to delete sender: received status code %d with message %v",
-			status, string(body))
-	}
-	logInfo.Printf("Sender %v deleted: %v\n", mad.Name, mad.Email)
 	return nil
 }
 
