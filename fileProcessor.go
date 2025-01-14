@@ -15,6 +15,7 @@ type ServiceCut struct {
 }
 type Address struct {
 	Name          string `json:"name"`
+	Entity        string `json:"entity"`
 	StreetAddress string `json:"streetAddress"`
 	City          string `json:"city"`
 	ABN           string `json:"abn"`

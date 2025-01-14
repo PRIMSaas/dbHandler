@@ -226,8 +226,12 @@ func addAddress(pdf *gofpdf.Fpdf, companyName string, address Address) {
 	addTable(pdf, tableData, []float64{40, 150}, 5)
 }
 func addAddressDate(pdf *gofpdf.Fpdf, address Address, date string) {
+	toName := address.Name
+	if len(strings.TrimSpace(address.Entity)) > 0 {
+		toName = strings.TrimSpace(address.Entity)
+	}
 	tableData := [][]TableText{
-		{TableText{text: "To:", font: Arial12B}, TableText{text: address.Name}, TableText{text: date, align: "R"}},
+		{TableText{text: "To:", font: Arial12B}, TableText{text: toName}, TableText{text: date, align: "R"}},
 		{blankCell, TableText{text: address.StreetAddress}, blankCell},
 		{blankCell, TableText{text: address.City}, blankCell},
 		{TableText{text: "ABN", font: Arial12B}, TableText{text: address.ABN}, blankCell},
